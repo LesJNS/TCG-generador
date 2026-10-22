@@ -1,0 +1,30 @@
+{
+  "_comentario": "Coordenadas en cm sobre la diapositiva original (33,867 x 19,05 cm). La imagen base es 16:9; px = cm * (ancho_imagen_px / 33,867).",
+  "diapositiva_cm": [33.867, 19.05],
+  "imagen_px": [3200, 1800],
+  "fuente": "Calibri, Carlito, Arial, sans-serif",
+  "interlineado": 1.2,
+  "linea_base": 0.786,
+  "caja_texto": {
+    "x": 4.66,
+    "y": 3.9,
+    "ancho": 16.94,
+    "margen_horizontal": 0.254,
+    "margen_superior": 0.127,
+    "limite_inferior": 11.7,
+    "alineacion": "centro"
+  },
+  "estilos": {
+    "normal": { "pt": 18, "color": "#000000", "negrita": false, "cursiva": false },
+    "nombre": { "pt": 20, "min_pt": 16, "color": "#0070C0", "negrita": true, "cursiva": true, "mayusculas": true },
+    "titulo": { "pt": 18, "min_pt": 14, "color": "#0070C0", "negrita": true, "cursiva": false, "comillas": true }
+  },
+  "texto_fijo": "CERTIFICAMOS QUE:",
+  "qr": {
+    "x": 12.0,
+    "y": 11.8,
+    "lado": 2.7,
+    "correccion_errores": "M",
+    "margen_modulos": 2
+  }
+}

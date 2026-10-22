@@ -1,0 +1,7 @@
+{
+  "name": "tcg-generador",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panel de administración (con contraseña) para emitir certificados TCG y publicarlos en el repo del sitio de verificación",
+  "engines": { "node": ">=20" }
+}

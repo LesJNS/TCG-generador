@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel de certificados · TCG</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login" hidden>
+  <form id="form-login" class="login-card" autocomplete="on">
+    <h1>Panel de certificados</h1>
+    <p class="nota">Towers Consulting Group (TCG) · acceso restringido</p>
+    <label>Contraseña
+      <input id="l-pass" type="password" autocomplete="current-password" required autofocus>
+    </label>
+    <p id="l-error" class="aviso err" role="alert"></p>
+    <button class="primary" type="submit" id="l-btn">Ingresar</button>
+  </form>
+</div>
+
+<!-- PANEL -->
+<div id="app" hidden>
+<header class="bar">
+  <h1>Panel de certificados <span>Towers Consulting Group (TCG)</span></h1>
+  <span class="row"><span class="pill" id="pill-repo"></span><button id="b-salir" class="salir" type="button">Salir</button></span>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="emitir" role="tab">Emitir</button>
+  <button class="tab" data-tab="emitidos" role="tab">Emitidos <b id="n-emitidos"></b></button>
+  <button class="tab" data-tab="masivo" role="tab">Importación masiva</button>
+  <button class="tab" data-tab="ajustes" role="tab">Ajustes</button>
+</nav>
+
+<main>
+  <section id="tab-emitir" class="panel">
+    <div class="grid2">
+      <form id="form" autocomplete="off">
+        <label>Nombre del participante
+          <input id="f-nombre" required placeholder="Nombre completo (se imprime en MAYÚSCULAS)">
+        </label>
+        <label>Título de la capacitación
+          <textarea id="f-capacitacion" rows="2" required placeholder="DESARROLLO E IMPLEMENTACIÓN DEL MODELO DE CALIFICACIÓN INTERNA"></textarea>
+        </label>
+        <label>Texto de fechas
+          <input id="f-fechas" required placeholder="Realizadas los días 5 y 20 de octubre de 2026.">
+        </label>
+        <label>Frase introductoria
+          <input id="f-frase" required>
+        </label>
+        <label>Área o empresa <small>(opcional; solo se guarda en el registro, no se imprime)</small>
+          <input id="f-area">
+        </label>
+        <label>Código
+          <span class="row">
+            <input id="f-codigo" required pattern="[A-Za-z0-9][A-Za-z0-9\-]{2,40}">
+            <button type="button" id="b-sugerir" class="ghost" title="Sugerir el siguiente código">Sugerir</button>
+          </span>
+          <small id="url-qr"></small>
+        </label>
+        <p id="aviso" class="aviso" role="status"></p>
+        <button type="submit" id="b-generar" class="primary">Generar y publicar certificado</button>
+      </form>
+
+      <div class="preview">
+        <canvas id="canvas" aria-label="Vista previa del certificado"></canvas>
+        <p class="nota" id="info-preview"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-emitidos" class="panel" hidden>
+    <div class="row between">
+      <input id="buscar" type="search" placeholder="Buscar por código, nombre, capacitación o área…">
+      <button id="b-impresion" class="ghost">PDF de impresión (vigentes)</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Código</th><th>Participante</th><th>Área</th><th>Emisión</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p id="vacio" class="nota" hidden>No hay certificados que coincidan.</p>
+  </section>
+
+  <section id="tab-masivo" class="panel" hidden>
+    <p>Carga un CSV con las columnas <code>nombre, capacitacion, fechas, area</code> (separado por comas o punto y coma, UTF-8). Los códigos se asignan en orden correlativo y todo el lote se publica en un solo commit.</p>
+    <div class="row">
+      <input type="file" id="csv-file" accept=".csv,text/csv,text/plain">
+      <button id="b-plantilla-csv" class="ghost" type="button">Descargar CSV de ejemplo</button>
+    </div>
+    <label>Frase introductoria para todo el lote <input id="m-frase"></label>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Código</th><th>Nombre</th><th>Capacitación</th><th>Fechas</th><th>Área</th><th>Resultado</th></tr></thead>
+      <tbody id="m-tbody"></tbody></table></div>
+    <p id="m-info" class="nota"></p>
+    <button id="b-masivo" class="primary" disabled>Generar y publicar certificados</button>
+  </section>
+
+  <section id="tab-ajustes" class="panel" hidden>
+    <p><strong>BASE_URL actual:</strong> <code id="c-base"></code></p>
+    <p class="nota">Es la variable de entorno <code>BASE_URL</code> de este proyecto en Vercel. Para cambiarla: edítala en Vercel (Settings → Environment Variables), vuelve a desplegar este panel y luego pulsa el botón de abajo para que los QR apunten a la nueva dirección.</p>
+    <p><strong>Repositorio del sitio público:</strong> <code id="c-repo"></code></p>
+    <button id="b-regenerar" class="primary" type="button">Regenerar todos los certificados con la BASE_URL actual</button>
+    <p id="c-info" class="nota"></p>
+  </section>
+</main>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/fflate.min.js"></script>
+<script src="render.js"></script>
+<script src="png.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
