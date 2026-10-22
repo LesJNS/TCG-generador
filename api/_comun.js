@@ -18,6 +18,9 @@ class HttpError extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
 }
 
+/** Fecha de hoy (AAAA-MM-DD) en hora de Lima: el servidor de Vercel corre en UTC y de noche daría el día siguiente. */
+const hoyLima = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
+
 const baseUrl = () => (process.env.BASE_URL || "https://tcg-certificados.vercel.app").replace(/\/+$/, "");
 
 function responder(res, status, obj) {
@@ -92,7 +95,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
 const ordenar = (lista) => lista.sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
 
 function siguienteCodigo(lista) {
-  const pref = `${CONFIG.prefijoCodigo}-${new Date().getFullYear()}-`;
+  const pref = `${CONFIG.prefijoCodigo}-${hoyLima().slice(0, 4)}-`;
   let max = 0;
   for (const c of lista) {
     if (c.codigo.startsWith(pref)) {
@@ -112,6 +115,7 @@ function validarRegistro(r) {
     else if (r[k].length > 400) err.push(`${k} demasiado largo`);
   }
   if (r.area != null && String(r.area).length > 200) err.push("área demasiado larga");
+  if (r.empresa != null && String(r.empresa).length > 200) err.push("empresa demasiado larga");
   return err;
 }
 
@@ -140,6 +144,6 @@ function paginaCredencial(plantilla, reg, base) {
 }
 
 module.exports = {
-  CONFIG, RE_CODIGO, RE_SHA, HttpError, baseUrl, responder, leerCuerpo,
+  CONFIG, RE_CODIGO, RE_SHA, HttpError, hoyLima, baseUrl, responder, leerCuerpo,
   manejador, ordenar, siguienteCodigo, validarRegistro, paginaCredencial,
 };

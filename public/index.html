@@ -52,7 +52,10 @@
         <label>Frase introductoria
           <input id="f-frase" required>
         </label>
-        <label>Área o empresa <small>(opcional; solo se guarda en el registro, no se imprime)</small>
+        <label>Empresa <small>(opcional; solo se guarda en el registro, no se imprime)</small>
+          <input id="f-empresa">
+        </label>
+        <label>Área <small>(opcional; solo se guarda en el registro, no se imprime)</small>
           <input id="f-area">
         </label>
         <label>Código
@@ -74,13 +77,30 @@
   </section>
 
   <section id="tab-emitidos" class="panel" hidden>
-    <div class="row between">
-      <input id="buscar" type="search" placeholder="Buscar por código, nombre, capacitación o área…">
-      <button id="b-impresion" class="ghost">PDF de impresión (vigentes)</button>
+    <div class="filtros">
+      <input id="buscar" type="search" placeholder="Buscar por código, nombre, empresa, área…">
+      <label class="fecha">Emisión desde <input type="date" id="f-desde"></label>
+      <label class="fecha">hasta <input type="date" id="f-hasta"></label>
+      <button id="b-limpiar" class="ghost" type="button">Limpiar filtros</button>
+    </div>
+    <div class="descargas">
+      <span id="sel-info" class="nota"></span>
+      <span class="row">
+        <select id="d-formato" aria-label="Formato de descarga">
+          <option value="pdf1">PDF único (una página por certificado)</option>
+          <option value="zip-pdf">ZIP con un PDF por certificado</option>
+          <option value="zip-png">ZIP con un PNG por certificado</option>
+        </select>
+        <button id="b-descargar" class="primary" type="button">Descargar</button>
+        <button id="b-asignar" class="ghost" type="button">Asignar empresa/área…</button>
+      </span>
     </div>
     <div class="scroll">
       <table>
-        <thead><tr><th>Código</th><th>Participante</th><th>Área</th><th>Emisión</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead><tr>
+          <th class="chk"><input type="checkbox" id="chk-todos" aria-label="Seleccionar todos los que se ven"></th>
+          <th>Código</th><th>Participante</th><th>Empresa</th><th>Área</th><th>Emisión</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -88,13 +108,13 @@
   </section>
 
   <section id="tab-masivo" class="panel" hidden>
-    <p>Carga un CSV con las columnas <code>nombre, capacitacion, fechas, area</code> (separado por comas o punto y coma, UTF-8). Los códigos se asignan en orden correlativo y todo el lote se publica en un solo commit.</p>
+    <p>Carga un CSV con las columnas <code>nombre, capacitacion, fechas</code> y, opcionalmente, <code>empresa, area</code> (separado por comas o punto y coma, UTF-8). Los códigos se asignan en orden correlativo y todo el lote se publica en un solo commit.</p>
     <div class="row">
       <input type="file" id="csv-file" accept=".csv,text/csv,text/plain">
       <button id="b-plantilla-csv" class="ghost" type="button">Descargar CSV de ejemplo</button>
     </div>
     <label>Frase introductoria para todo el lote <input id="m-frase"></label>
-    <div class="scroll"><table><thead><tr><th>#</th><th>Código</th><th>Nombre</th><th>Capacitación</th><th>Fechas</th><th>Área</th><th>Resultado</th></tr></thead>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Código</th><th>Nombre</th><th>Capacitación</th><th>Fechas</th><th>Empresa</th><th>Área</th><th>Resultado</th></tr></thead>
       <tbody id="m-tbody"></tbody></table></div>
     <p id="m-info" class="nota"></p>
     <button id="b-masivo" class="primary" disabled>Generar y publicar certificados</button>
@@ -109,6 +129,19 @@
   </section>
 </main>
 </div>
+
+<dialog id="dlg-editar">
+  <form method="dialog" id="form-editar">
+    <h2 id="e-titulo">Asignar empresa y área</h2>
+    <p class="nota" id="e-ayuda"></p>
+    <label>Empresa <input id="e-empresa" maxlength="200"></label>
+    <label>Área <input id="e-area" maxlength="200"></label>
+    <p class="row fin">
+      <button type="button" id="e-cancelar" class="ghost">Cancelar</button>
+      <button type="submit" id="e-guardar" class="primary">Guardar y publicar</button>
+    </p>
+  </form>
+</dialog>
 
 <div id="toast" class="toast" role="status"></div>
 

@@ -1,5 +1,5 @@
 "use strict";
-const { HttpError, RE_CODIGO, manejador, leerCuerpo } = require("./_comun");
+const { HttpError, RE_CODIGO, hoyLima, manejador, leerCuerpo } = require("./_comun");
 const gh = require("./_github");
 
 async function intentar(codigo, estado) {
@@ -8,7 +8,7 @@ async function intentar(codigo, estado) {
   const c = lista.find((x) => x.codigo === codigo);
   if (!c) throw new HttpError(404, "No existe ese certificado");
   c.estado = estado;
-  if (estado === "revocado") c.fecha_revocacion = new Date().toISOString().slice(0, 10);
+  if (estado === "revocado") c.fecha_revocacion = hoyLima();
   else delete c.fecha_revocacion;
   await gh.confirmar([{ rel: "data/certificados.json", texto: JSON.stringify(lista, null, 2) + "\n" }],
     `${estado === "revocado" ? "Revoca" : "Reactiva"} ${codigo}`);

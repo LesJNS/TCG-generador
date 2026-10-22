@@ -50,3 +50,21 @@ button.salir:hover { background:rgba(255,255,255,.15); }
 .progreso { position:fixed; inset:0; background:rgba(11,42,85,.55); display:grid; place-items:center; z-index:10; }
 .progreso > div { background:#fff; padding:22px 28px; border-radius:10px; min-width:280px; text-align:center; }
 .progreso progress { width:100%; height:12px; margin-top:12px; }
+
+/* ---- filtros, descargas y edición en Emitidos ---- */
+.filtros { display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin-bottom:12px; }
+.filtros > input[type=search] { flex:1 1 260px; width:auto; }
+.filtros label.fecha { flex:0 0 auto; font-size:13px; }
+.filtros label.fecha input { width:auto; }
+.descargas { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.descargas .row { flex-wrap:wrap; }
+.descargas select { width:auto; max-width:100%; }
+th.chk, td.chk { width:34px; text-align:center; }
+td.chk input, th.chk input { width:auto; transform:scale(1.2); cursor:pointer; }
+tr.sel td { background:#eaf3fb; }
+td.acc button.mini:not(.danger) { background:#fff; }
+dialog { border:0; border-radius:12px; padding:22px 24px; width:min(92vw,420px); box-shadow:0 10px 40px rgba(0,0,0,.3); }
+dialog::backdrop { background:rgba(11,42,85,.5); }
+dialog h2 { margin:0 0 6px; font-size:19px; color:var(--navy); }
+dialog form { display:flex; flex-direction:column; gap:12px; }
+.row.fin { justify-content:flex-end; margin:6px 0 0; }

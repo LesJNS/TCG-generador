@@ -1,5 +1,5 @@
 "use strict";
-const { CONFIG, RE_SHA, HttpError, baseUrl, manejador, leerCuerpo, ordenar, validarRegistro, paginaCredencial } = require("./_comun");
+const { CONFIG, RE_SHA, HttpError, hoyLima, baseUrl, manejador, leerCuerpo, ordenar, validarRegistro, paginaCredencial } = require("./_comun");
 const gh = require("./_github");
 
 const MAX_ITEMS = 40;
@@ -25,6 +25,7 @@ async function intentar({ items, sobrescribir }) {
     const reg = {
       codigo: r.codigo,
       nombre: r.nombre.trim(),
+      empresa: (r.empresa === undefined && previo ? previo.empresa || "" : r.empresa || "").trim(),
       area: (r.area || "").trim(),
       capacitacion: r.capacitacion.trim(),
       frase: r.frase.trim(),
@@ -32,7 +33,7 @@ async function intentar({ items, sobrescribir }) {
       emisor: CONFIG.emisor,
       firmantes: CONFIG.firmantes,
       estado: previo ? previo.estado : "vigente",
-      fecha_emision: previo ? previo.fecha_emision : new Date().toISOString().slice(0, 10),
+      fecha_emision: previo ? previo.fecha_emision : hoyLima(),
       imagen: `certs/${r.codigo}.png`,
       vista: `certs/${r.codigo}.jpg`,
       pdf: `certs/${r.codigo}.pdf`,

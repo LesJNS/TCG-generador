@@ -46,10 +46,21 @@ sesiones abiertas, cambia también `SESSION_SECRET`.
 
 ## 3. Uso
 
-- **Emitir**: completa los campos y *Generar y publicar certificado*. El sitio público muestra el
-  certificado cuando termina su despliegue (~1 minuto).
-- **Emitidos**: búsqueda, **Revocar / Reactivar** (commit al JSON) y *PDF de impresión* (se descarga).
-- **Importación masiva**: CSV `nombre, capacitacion, fechas, area`; todo el lote en un solo commit.
+- **Emitir**: completa los campos y *Generar y publicar certificado*. La **empresa** y el **área** son
+  opcionales y no se imprimen (solo quedan en el registro). El sitio público muestra el certificado cuando
+  termina su despliegue (~1 minuto).
+- **Emitidos**: tabla con columnas Código, Participante, **Empresa**, Área, Emisión y Estado.
+  - *Buscar* por código, nombre, empresa, área o capacitación, y *filtrar por rango de fechas de emisión*.
+  - **Descarga directa** de un certificado: botones **PNG** y **PDF** de cada fila (se generan al instante en el
+    navegador, con el QR actual).
+  - **Descarga por rango o selección**: marca casillas (la casilla de arriba marca todos los visibles) o deja
+    sin marcar para usar todo lo que se ve; elige *PDF único*, *ZIP de PDF* o *ZIP de PNG* y pulsa **Descargar**.
+    Los revocados no se incluyen. Máximo 60 certificados por descarga.
+  - **Editar** (por fila) o **Asignar empresa/área…** (a la selección): cambia esos dos datos en un solo commit,
+    sin tocar las imágenes ni los QR. En la edición masiva solo cambian los campos que llenes.
+  - **Revocar / Reactivar** (commit al JSON).
+- **Importación masiva**: CSV `nombre, capacitacion, fechas` y, opcionalmente, `empresa, area`; todo el lote en
+  un solo commit.
 - **Ajustes**: muestra `BASE_URL` y el repo. Si cambia la dirección pública: edita `BASE_URL` en Vercel,
   redespliega este panel y pulsa **Regenerar todos** (los QR se rehacen; conserva códigos, fechas y estados).
 
@@ -73,13 +84,14 @@ python dev/probar_panel.py
 Arranca un GitHub simulado (`dev/github_falso.js`, sembrado con `../publico`) y el servidor de desarrollo
 (`dev/servidor.js`), y recorre: login y errores de seguridad, emisión (PNG sin pérdida, QR decodificado
 en PNG/JPG/PDF), revocar, importación masiva en un commit, conflicto de commits con reintento,
-regeneración, PDF de impresión y cierre de sesión. Requiere Node 20+, `playwright`, `pillow`,
+regeneración, empresa y edición masiva, filtros por fecha, descargas (PNG/PDF directos, ZIP y PDF único con QR
+decodificado) y cierre de sesión. Requiere Node 20+, `playwright`, `pillow`,
 `opencv-python`, `pymupdf`.
 
 ## Estructura
 
 ```
-api/          funciones de Vercel: login, logout, estado, blob, publicar, estado-cert (+ _auth, _github, _comun)
+api/          funciones de Vercel: login, logout, estado, blob, publicar, estado-cert, editar (+ _auth, _github, _comun)
 public/       panel (HTML/JS puros): index.html, app.js, render.js, png.js, vendor/, plantilla/
 dev/          servidor de desarrollo, GitHub simulado y prueba de extremo a extremo
 ```
