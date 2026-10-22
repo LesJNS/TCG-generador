@@ -70,9 +70,15 @@ sesiones abiertas, cambia también `SESSION_SECRET`.
 
 ## Seguridad
 
-- Contraseña verificada en el servidor (comparación en tiempo constante); sesión en cookie `HttpOnly`,
-  `Secure`, `SameSite=Strict`, firmada con HMAC y vigente 8 horas.
-- Todas las rutas de `/api` (salvo `login` y `logout`) exigen sesión; validan `Origin` y tipo de contenido.
+- Contraseña verificada en el servidor (comparación en tiempo constante). La sesión es un **token firmado
+  (HMAC)** que el navegador guarda en `sessionStorage` y envía en la cabecera `Authorization`: **no hay cookie**,
+  así que **al cerrar la pestaña hay que volver a ingresar la contraseña** (recargar la pestaña no la pierde).
+- El token **caduca a las 2 horas sin actividad** (cada petición válida lo renueva) y, en cualquier caso, a las
+  **8 horas** del ingreso. Salir borra el token y los datos de la pantalla. Cambiar `SESSION_SECRET` invalida
+  todos los tokens.
+- Todas las rutas de `/api` (salvo `login`) exigen el token; validan `Origin` y tipo de contenido.
+- Cabeceras de seguridad (`vercel.json`): CSP estricta (solo scripts propios, sin `unsafe-eval`, sin iframes),
+  `X-Frame-Options`, `nosniff`, `no-referrer` y `noindex`.
 - Cada intento fallido de login espera ~0,8 s. Para una defensa real contra fuerza bruta, activa una regla
   de límite de tasa para `/api/login` en Vercel → Firewall.
 - Hay **una sola contraseña compartida**: no distingue quién emitió. Los commits salen a nombre del dueño
@@ -95,7 +101,7 @@ decodificado) y cierre de sesión. Requiere Node 20+, `playwright`, `pillow`,
 ## Estructura
 
 ```
-api/          funciones de Vercel: login, logout, estado, blob, publicar, estado-cert, editar, eliminar (+ _auth, _github, _comun)
+api/          funciones de Vercel: login, estado, blob, publicar, estado-cert, editar, eliminar (+ _auth, _github, _comun)
 public/       panel (HTML/JS puros): index.html, app.js, render.js, png.js, vendor/, plantilla/
 dev/          servidor de desarrollo, GitHub simulado y prueba de extremo a extremo
 ```

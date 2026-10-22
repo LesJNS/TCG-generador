@@ -17,12 +17,24 @@
 
   class ErrorApi extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 
+  // El token de sesión vive en sessionStorage: se borra al cerrar la pestaña (no hay cookie persistente).
+  let tokenEnMemoria = "";
+  const leerToken = () => { try { return sessionStorage.getItem("tcg_sesion") || ""; } catch { return tokenEnMemoria; } };
+  const guardarToken = (t) => { tokenEnMemoria = t; try { sessionStorage.setItem("tcg_sesion", t); } catch { /* sin storage: queda en memoria */ } };
+  const borrarToken = () => { tokenEnMemoria = ""; try { sessionStorage.removeItem("tcg_sesion"); } catch { /* nada */ } };
+
   async function llamar(ruta, opciones) {
+    opciones = opciones || {};
+    const headers = { ...(opciones.headers || {}) };
+    const token = leerToken();
+    if (token) headers.Authorization = "Bearer " + token;
     let r;
-    try { r = await fetch(ruta, { credentials: "same-origin", ...opciones }); }
+    try { r = await fetch(ruta, { ...opciones, headers }); }
     catch { throw new ErrorApi("Sin conexión con el servidor", 0); }
+    const renovado = r.headers.get("X-Sesion"); // cada respuesta válida extiende la sesión por inactividad
+    if (renovado) guardarToken(renovado);
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401 && ruta !== "/api/login") mostrarLogin();
+    if (r.status === 401 && ruta !== "/api/login") { borrarToken(); mostrarLogin(); }
     if (!r.ok) throw new ErrorApi(j.error || r.statusText, r.status);
     return j;
   }
@@ -68,21 +80,29 @@
   }
 
   // ---------- sesión ----------
-  function mostrarLogin() { $("app").hidden = true; $("login").hidden = false; $("l-pass").focus(); }
+  /** Al cerrar sesión o vencer, no deja datos de certificados en pantalla ni en memoria. */
+  function limpiarDatos() {
+    S.certificados = []; S.seleccion.clear(); filasCsv = [];
+    ["tbody", "m-tbody"].forEach((i) => ($(i).innerHTML = ""));
+    ["f-nombre", "f-area", "f-empresa"].forEach((i) => ($(i).value = ""));
+  }
+
+  function mostrarLogin() { limpiarDatos(); $("app").hidden = true; $("login").hidden = false; $("l-pass").focus(); }
 
   async function onLogin(ev) {
     ev.preventDefault();
     const b = $("l-btn"); b.disabled = true; $("l-error").textContent = "";
     try {
-      await api("/api/login", { password: $("l-pass").value });
+      const r = await api("/api/login", { password: $("l-pass").value });
+      guardarToken(r.token);
       $("l-pass").value = "";
       await entrar();
     } catch (e) { $("l-error").textContent = e.message; }
     finally { b.disabled = false; }
   }
 
-  async function salir() {
-    try { await api("/api/logout", {}); } catch { /* da igual */ }
+  function salir() {
+    borrarToken();
     mostrarLogin();
   }
 
@@ -192,7 +212,7 @@
   let pendiente = false;
   function setAviso(msg, clase) { const a = $("aviso"); a.textContent = msg; a.className = "aviso " + (clase || ""); }
 
-  function actualizarPreview() {
+  function actualizarPreview(porEntrada) {
     if (pendiente) return;
     pendiente = true;
     requestAnimationFrame(() => {
@@ -202,7 +222,9 @@
       $("url-qr").textContent = d.codigo ? `QR → ${S.config.baseUrl}/c/${d.codigo}` : "";
       $("info-preview").textContent = info.escala < 1 ? "El texto se redujo automáticamente para que quepa." : "";
       const existe = S.certificados.some((c) => c.codigo === d.codigo);
-      setAviso(existe ? `El código ${d.codigo} ya existe: generar lo sobrescribirá.` : "", existe ? "err" : "");
+      const a = $("aviso");
+      if (existe) setAviso(`El código ${d.codigo} ya existe: generar lo sobrescribirá.`, "err");
+      else if (a.classList.contains("err") || (porEntrada && a.classList.contains("ok"))) setAviso("", ""); // el aviso de éxito se conserva hasta que se vuelve a escribir
     });
   }
 
@@ -543,7 +565,7 @@
       document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
       document.querySelectorAll(".panel").forEach((p) => (p.hidden = p.id !== "tab-" + t.dataset.tab));
     }));
-    ["f-nombre", "f-capacitacion", "f-fechas", "f-frase", "f-empresa", "f-area", "f-codigo"].forEach((i) => $(i).addEventListener("input", actualizarPreview));
+    ["f-nombre", "f-capacitacion", "f-fechas", "f-frase", "f-empresa", "f-area", "f-codigo"].forEach((i) => $(i).addEventListener("input", () => actualizarPreview(true)));
     $("form").addEventListener("submit", onGenerar);
     $("b-sugerir").addEventListener("click", () => { $("f-codigo").value = S.siguiente; actualizarPreview(); });
     ["buscar", "f-desde", "f-hasta"].forEach((i) => $(i).addEventListener("input", renderLista));

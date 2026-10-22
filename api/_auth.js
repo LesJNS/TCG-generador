@@ -1,9 +1,12 @@
 "use strict";
-/* Sesión por cookie firmada (HMAC-SHA256). La contraseña y el secreto viven solo en variables de entorno. */
+/* Sesión por token firmado (HMAC-SHA256) que el navegador guarda en sessionStorage y envía en la cabecera
+   Authorization. No hay cookie: al cerrar la pestaña el token desaparece y hay que ingresar la contraseña otra vez.
+   Caducidad: 2 horas sin actividad (cada petición válida entrega un token renovado) y 8 horas como máximo desde el
+   ingreso. La contraseña y el secreto viven solo en variables de entorno. */
 const crypto = require("crypto");
 
-const COOKIE = "tcg_sesion";
-const DURACION_MS = 8 * 60 * 60 * 1000; // 8 horas
+const INACTIVIDAD_MS = 2 * 60 * 60 * 1000;
+const MAXIMO_MS = 8 * 60 * 60 * 1000;
 
 function secreto() {
   const s = process.env.SESSION_SECRET;
@@ -14,8 +17,7 @@ function secreto() {
   return s;
 }
 
-const firmar = (exp) => crypto.createHmac("sha256", secreto()).update(String(exp)).digest("base64url");
-
+const firmar = (texto) => crypto.createHmac("sha256", secreto()).update(texto).digest("base64url");
 const hash = (s) => crypto.createHash("sha256").update(String(s)).digest();
 
 /** Comparación en tiempo constante (se comparan hashes para no filtrar la longitud). */
@@ -28,27 +30,27 @@ function passwordOk(candidata) {
   return crypto.timingSafeEqual(hash(candidata || ""), hash(real));
 }
 
-function crearSesion() {
-  const exp = Date.now() + DURACION_MS;
-  return `${exp}.${firmar(exp)}`;
+/** Token "inicio.vence.firma"; vence a las 2 h de inactividad pero nunca pasa de 8 h desde el inicio. */
+function emitir(inicio) {
+  const vence = Math.min(Date.now() + INACTIVIDAD_MS, inicio + MAXIMO_MS);
+  const cuerpo = `${inicio}.${vence}`;
+  return `${cuerpo}.${firmar(cuerpo)}`;
 }
 
-function leerCookie(req) {
-  const m = (req.headers.cookie || "").split(/;\s*/).find((c) => c.startsWith(COOKIE + "="));
-  return m ? m.slice(COOKIE.length + 1) : "";
-}
+const crearSesion = () => emitir(Date.now());
 
-function sesionValida(req) {
-  const [exp, firma] = leerCookie(req).split(".");
-  if (!exp || !firma || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-  const esperado = Buffer.from(firmar(exp));
+/** Si la petición trae un token válido, devuelve uno renovado; si no, null. */
+function renovar(req) {
+  const m = /^Bearer ([\w.-]+)$/.exec(req.headers.authorization || "");
+  if (!m) return null;
+  const [inicio, vence, firma] = m[1].split(".");
+  if (!/^\d+$/.test(inicio || "") || !/^\d+$/.test(vence || "") || !firma) return null;
+  const esperado = Buffer.from(firmar(`${inicio}.${vence}`));
   const recibido = Buffer.from(firma);
-  return esperado.length === recibido.length && crypto.timingSafeEqual(esperado, recibido);
+  if (esperado.length !== recibido.length || !crypto.timingSafeEqual(esperado, recibido)) return null;
+  const ahora = Date.now();
+  if (Number(vence) < ahora || Number(inicio) + MAXIMO_MS < ahora) return null;
+  return emitir(Number(inicio));
 }
 
-function cookie(req, valor, maxAgeSeg) {
-  const seguro = req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
-  return `${COOKIE}=${valor}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSeg}${seguro}`;
-}
-
-module.exports = { passwordOk, crearSesion, sesionValida, cookie, DURACION_MS };
+module.exports = { passwordOk, crearSesion, renovar };

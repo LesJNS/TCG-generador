@@ -77,7 +77,11 @@ function manejador({ metodo, tipo, publico = false }, fn) {
   return async function (req, res) {
     try {
       validarPeticion(req, { metodo, tipo });
-      if (!publico && !auth.sesionValida(req)) throw new HttpError(401, "Sesión no iniciada");
+      if (!publico) {
+        const renovado = auth.renovar(req);
+        if (!renovado) throw new HttpError(401, "Sesión no iniciada o vencida");
+        res.setHeader("X-Sesion", renovado); // el cliente reemplaza su token: la sesión se extiende con la actividad
+      }
       const salida = await fn(req, res);
       if (salida !== undefined && !res.writableEnded) responder(res, 200, salida);
     } catch (e) {

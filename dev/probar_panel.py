@@ -5,6 +5,9 @@ flujo completo en un navegador (Edge vía Playwright). Requiere: Node 20+, playw
 
     python dev/probar_panel.py
 """
+import base64
+import hashlib
+import hmac
 import io
 import json
 import shutil
@@ -83,6 +86,12 @@ def registros():
     return json.loads(gh_archivo("publico/data/certificados.json"))
 
 
+def firmar_token(inicio_ms, vence_ms, secreto=None):
+    cuerpo = f"{inicio_ms}.{vence_ms}"
+    firma = hmac.new((secreto or SESSION).encode(), cuerpo.encode(), hashlib.sha256).digest()
+    return cuerpo + "." + base64.urlsafe_b64encode(firma).decode().rstrip("=")
+
+
 def decodificar_qr(img_bgr):
     d = cv2.QRCodeDetectorAruco()
     t = d.detectAndDecode(img_bgr)[0]
@@ -112,20 +121,31 @@ try:
     check("login con contraseña mala -> 401 y con retardo", s == 401 and dt >= 0.7, f"{dt:.2f}s")
     check("login con Origin ajeno -> 403", http(f"{BASE}/api/login", "POST", json.dumps({"password": PASS}).encode(), {"Content-Type": "application/json", "Origin": "http://evil.com"})[0] == 403)
     check("login con text/plain -> 415", http(f"{BASE}/api/login", "POST", b"{}", {"Content-Type": "text/plain"})[0] == 415)
-    s, _, _, h = http(f"{BASE}/api/login", "POST", json.dumps({"password": PASS}).encode(), {"Content-Type": "application/json"})
-    ck = h.get("Set-Cookie", "")
-    check("login correcto: cookie HttpOnly + SameSite=Strict", s == 200 and "HttpOnly" in ck and "SameSite=Strict" in ck, ck.split(";")[0][:30] + "…")
-    cookie = ck.split(";")[0]
-    check("sesión válida accede a /api/estado", http(f"{BASE}/api/estado", headers={"Cookie": cookie})[0] == 200)
-    manipulada = cookie[:-3] + ("aaa" if not cookie.endswith("aaa") else "bbb")
-    check("cookie manipulada -> 401", http(f"{BASE}/api/estado", headers={"Cookie": manipulada})[0] == 401)
-    vencida = f"tcg_sesion={int(time.time() * 1000) - 1000}.{'A' * 43}"
-    check("cookie vencida/falsa -> 401", http(f"{BASE}/api/estado", headers={"Cookie": vencida})[0] == 401)
-    s, cuerpo, _, _ = http(f"{BASE}/api/estado", headers={"Cookie": cookie})
+    s, cuerpo_login, _, h = http(f"{BASE}/api/login", "POST", json.dumps({"password": PASS}).encode(), {"Content-Type": "application/json"})
+    tok = json.loads(cuerpo_login).get("token", "")
+    check("login correcto: devuelve un token y NO crea ninguna cookie (nada persiste al cerrar la pestaña)", s == 200 and tok.count(".") == 2 and not h.get("Set-Cookie"))
+    AUTH = {"Authorization": f"Bearer {tok}"}
+    s, _, _, h2 = http(f"{BASE}/api/estado", headers=AUTH)
+    check("sesión válida accede a /api/estado", s == 200)
+    renovado = h2.get("X-Sesion", "")
+    check("cada respuesta entrega un token renovado (inactividad)", renovado.count(".") == 2 and renovado.split(".")[0] == tok.split(".")[0], renovado[:25])
+    check("el token renovado también funciona", http(f"{BASE}/api/estado", headers={"Authorization": f"Bearer {renovado}"})[0] == 200)
+    check("token manipulado -> 401", http(f"{BASE}/api/estado", headers={"Authorization": "Bearer " + tok[:-3] + ("aaa" if not tok.endswith("aaa") else "bbb")})[0] == 401)
+    ahora = int(time.time() * 1000)
+    H = 3600 * 1000
+    check("token firmado válido (mi firma coincide con la del servidor)", http(f"{BASE}/api/estado", headers={"Authorization": "Bearer " + firmar_token(ahora - 1000, ahora + H)})[0] == 200)
+    check("token vencido por inactividad -> 401", http(f"{BASE}/api/estado", headers={"Authorization": "Bearer " + firmar_token(ahora - 3 * H, ahora - 1000)})[0] == 401)
+    check("token con más de 8 h desde el ingreso -> 401 aunque 'venza' después", http(f"{BASE}/api/estado", headers={"Authorization": "Bearer " + firmar_token(ahora - 9 * H, ahora + H)})[0] == 401)
+    check("token firmado con otro secreto -> 401", http(f"{BASE}/api/estado", headers={"Authorization": "Bearer " + firmar_token(ahora - 1000, ahora + H, "otro-secreto-distinto-123")})[0] == 401)
+    check("la cookie ya no sirve como credencial -> 401", http(f"{BASE}/api/estado", headers={"Cookie": "tcg_sesion=" + tok})[0] == 401)
+    s, cuerpo, _, _ = http(f"{BASE}/api/estado", headers=AUTH)
     check("el token de GitHub y la contraseña no aparecen en las respuestas", TOKEN.encode() not in cuerpo and PASS.encode() not in cuerpo)
     todo = b"".join((RAIZ / "public" / f).read_bytes() for f in ("app.js", "index.html", "render.js", "png.js"))
+    sc, _, _, hs = http(f"{BASE}/")
+    csp = hs.get("Content-Security-Policy", "")
+    check("la página sirve CSP restrictiva (sin unsafe-eval, sin scripts externos)", "script-src 'self'" in csp and "unsafe-eval" not in csp and "frame-ancestors 'none'" in csp)
     check("el token/contraseña no están en los archivos estáticos", TOKEN.encode() not in todo and PASS.encode() not in todo)
-    J = {"Content-Type": "application/json", "Cookie": cookie}
+    J = {"Content-Type": "application/json", **AUTH}
     check("editar sin cambios -> 400", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["TCG-CI-2026-001"]}).encode(), J)[0] == 400)
     check("editar con código inválido -> 400", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["../x"], "empresa": "a"}).encode(), J)[0] == 400)
     check("POST /api/eliminar sin sesión -> 401", http(f"{BASE}/api/eliminar", "POST", b"{}", {"Content-Type": "application/json"})[0] == 401)
@@ -133,17 +153,17 @@ try:
     check("eliminar lista vacía -> 400", http(f"{BASE}/api/eliminar", "POST", json.dumps({"codigos": []}).encode(), J)[0] == 400)
     check("eliminar código inexistente -> 404", http(f"{BASE}/api/eliminar", "POST", json.dumps({"codigos": ["TCG-CI-2026-999"]}).encode(), J)[0] == 404)
     check("editar código inexistente -> 404", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["TCG-CI-2026-999"], "empresa": "a"}).encode(), J)[0] == 404)
-    s, c, _, _ = http(f"{BASE}/api/blob", "POST", b"", {"Content-Type": "application/octet-stream", "Cookie": cookie})
+    s, c, _, _ = http(f"{BASE}/api/blob", "POST", b"", {"Content-Type": "application/octet-stream", **AUTH})
     check("blob vacío -> 400", s == 400)
-    s, c, _, _ = http(f"{BASE}/api/publicar", "POST", json.dumps({"items": [{"registro": {"codigo": "../../x", "nombre": "a", "capacitacion": "a", "fechas": "a", "frase": "a"}, "png": "0" * 40, "jpg": "0" * 40, "pdf": "0" * 40}]}).encode(), {"Content-Type": "application/json", "Cookie": cookie})
+    s, c, _, _ = http(f"{BASE}/api/publicar", "POST", json.dumps({"items": [{"registro": {"codigo": "../../x", "nombre": "a", "capacitacion": "a", "fechas": "a", "frase": "a"}, "png": "0" * 40, "jpg": "0" * 40, "pdf": "0" * 40}]}).encode(), {"Content-Type": "application/json", **AUTH})
     check("publicar con código malicioso -> 400", s == 400, c.decode()[:80])
-    s, c, _, _ = http(f"{BASE}/api/blob", "POST", b"a" * 5_000_000, {"Content-Type": "application/octet-stream", "Cookie": cookie})
+    s, c, _, _ = http(f"{BASE}/api/blob", "POST", b"a" * 5_000_000, {"Content-Type": "application/octet-stream", **AUTH})
     check("blob > 4,4 MB -> 413", s == 413)
 
     # ---------------- panel en el navegador ----------------
     with sync_playwright() as p:
         b = p.chromium.launch(channel="msedge")
-        ctx = b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+        ctx = b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True, bypass_csp=True)  # Playwright evalúa texto: la CSP se prueba abajo
         pg = ctx.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
@@ -163,7 +183,20 @@ try:
         check("panel cargado: 11 emitidos", pg.inner_text("#n-emitidos") == "(11)", pg.inner_text("#n-emitidos"))
         check("código sugerido = 012", pg.input_value("#f-codigo") == "TCG-CI-2026-012")
         pg.reload(); pg.wait_for_selector("#app:not([hidden])")
-        check("la sesión persiste al recargar", pg.is_visible("#app"))
+        check("la sesión persiste al recargar la misma pestaña", pg.is_visible("#app"))
+        check("el navegador no guarda ninguna cookie", ctx.cookies() == [], str(ctx.cookies()))
+        check("el token está en sessionStorage (se borra al cerrar la pestaña)", pg.evaluate("!!sessionStorage.getItem('tcg_sesion')") and pg.evaluate("!localStorage.getItem('tcg_sesion')"))
+        otra = ctx.new_page()   # equivale a cerrar la pestaña y volver a abrir el sitio
+        otra.goto(BASE)
+        otra.wait_for_selector("#login:not([hidden])")
+        check("una pestaña nueva NO hereda la sesión: pide contraseña", otra.is_hidden("#app") and otra.is_visible("#login"))
+        otra.close()
+        ahora_ms = int(time.time() * 1000)
+        pg.evaluate("t => sessionStorage.setItem('tcg_sesion', t)", firmar_token(ahora_ms - 3 * 3600 * 1000, ahora_ms - 1000))
+        pg.reload(); pg.wait_for_selector("#login:not([hidden])")
+        check("con un token vencido (2 h sin uso) la pantalla vuelve al login", pg.is_hidden("#app") and not pg.evaluate("sessionStorage.getItem('tcg_sesion')"))
+        pg.fill("#l-pass", PASS); pg.click("#l-btn")
+        pg.wait_for_selector("#app:not([hidden])")
 
         print("== Emitir uno ==")
         pg.fill("#f-nombre", "Ricardo Adrian Francisco Rodriguez Gomez")
@@ -413,7 +446,7 @@ try:
         check("eliminar uno: borró PNG, JPG, PDF y la página; los demás siguen",
               not any("TCG-CI-2026-016" in f for f in lista) and "publico/certs/TCG-CI-2026-012.png" in lista and "publico/c/TCG-CI-2026-012.html" in lista)
         check("el código eliminado queda registrado (data/eliminados.json)", json.loads(gh_archivo("publico/data/eliminados.json")) == ["TCG-CI-2026-016"])
-        sig = json.loads(http(f"{BASE}/api/estado", headers={"Cookie": cookie})[1])["siguienteCodigo"]
+        sig = json.loads(http(f"{BASE}/api/estado", headers=AUTH)[1])["siguienteCodigo"]
         check("el código eliminado NO se vuelve a sugerir (017, no 016)", sig == "TCG-CI-2026-017", sig)
         cuerpo = json.dumps({"items": [{"registro": {"codigo": "TCG-CI-2026-016", "nombre": "x", "capacitacion": "x", "fechas": "x", "frase": "x"}, "png": "0" * 40, "jpg": "0" * 40, "pdf": "0" * 40}]}).encode()
         st, resp, _, _ = http(f"{BASE}/api/publicar", "POST", cuerpo, J)
@@ -438,15 +471,57 @@ try:
         check("eliminados.json acumula los códigos", json.loads(gh_archivo("publico/data/eliminados.json")) == sorted(["TCG-CI-2026-016"] + codigos))
         check("la selección se limpia tras eliminar", pg.is_disabled("#b-eliminar") and "Sin selección" in pg.inner_text("#sel-info"))
         check("los eliminados ya no aparecen en la tabla", not any(c in pg.inner_text("#tbody") for c in codigos))
-        sig = json.loads(http(f"{BASE}/api/estado", headers={"Cookie": cookie})[1])["siguienteCodigo"]
+        sig = json.loads(http(f"{BASE}/api/estado", headers=AUTH)[1])["siguienteCodigo"]
         check("siguiente código sigue siendo 017 (nunca se reutilizan)", sig == "TCG-CI-2026-017", sig)
 
         print("== Salir ==")
         pg.click("#b-salir")
         pg.wait_for_selector("#login:not([hidden])")
         check("salir vuelve al login", pg.is_hidden("#app"))
-        check("tras salir /api/estado devuelve 401", pg.evaluate("fetch('/api/estado').then(r => r.status)") == 401)
+        check("tras salir el token se borra y /api/estado devuelve 401", pg.evaluate("sessionStorage.getItem('tcg_sesion')") is None and pg.evaluate("fetch('/api/estado').then(r => r.status)") == 401)
+        check("al salir no quedan datos de certificados en pantalla", pg.inner_text("#tbody").strip() == "" and pg.input_value("#f-nombre") == "")
+        pg.reload(); pg.wait_for_selector("#login:not([hidden])")
+        check("recargar después de salir sigue pidiendo contraseña", pg.is_hidden("#app"))
         check("sin errores de JavaScript", not errs, "; ".join(errs))
+
+        print("== CSP real (otro navegador SIN bypass: todo el panel debe funcionar bajo la política) ==")
+        ctx2 = b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+        p2 = ctx2.new_page()
+        viol, errs2 = [], []
+        p2.on("console", lambda m: viol.append(m.text) if "Content Security Policy" in m.text or "Content-Security-Policy" in m.text else None)
+        p2.on("pageerror", lambda e: errs2.append(str(e)))
+        p2.on("dialog", lambda d: d.accept())
+        p2.goto(BASE)
+        p2.wait_for_selector("#login:not([hidden])")
+        p2.fill("#l-pass", PASS); p2.click("#l-btn")
+        p2.wait_for_selector("#app:not([hidden])")
+        p2.locator("#tab-emitir").wait_for()
+        p2.fill("#f-nombre", "Prueba Bajo CSP"); p2.fill("#f-capacitacion", "CURSO CSP"); p2.fill("#f-fechas", "Realizada el 4 de noviembre de 2026.")
+        p2.click("#b-generar")
+        p2.locator("#aviso", has_text="Publicado:").wait_for(timeout=120000)
+        check("bajo CSP: se genera y publica un certificado (canvas, PNG propio, jsPDF, subida)", any(r["nombre"] == "Prueba Bajo CSP" for r in registros()))
+        p2.click('[data-tab="emitidos"]')
+        p2.fill("#buscar", "Prueba Bajo CSP")
+        with p2.expect_download(timeout=120000) as d1:
+            p2.locator("#tbody tr button", has_text="PNG").click()
+        with p2.expect_download(timeout=120000) as d2:
+            p2.locator("#tbody tr button", has_text="PDF").click()
+        check("bajo CSP: descargas directas PNG y PDF", d1.value.suggested_filename.endswith(".png") and d2.value.suggested_filename.endswith(".pdf"))
+        p2.fill("#buscar", "")
+        p2.select_option("#d-formato", "zip-png")
+        p2.locator("#tbody tr").first.locator("input[type=checkbox]").check()
+        with p2.expect_download(timeout=120000) as d3:
+            p2.click("#b-descargar")
+        check("bajo CSP: ZIP (fflate) y selección", d3.value.suggested_filename.endswith("_PNG.zip"))
+        p2.locator("#tbody tr", has_text="Prueba Bajo CSP").locator("input[type=checkbox]").check()
+        p2.click("#b-asignar")
+        p2.locator("#dlg-editar[open]").wait_for()
+        p2.fill("#e-empresa", "Empresa CSP"); p2.click("#e-guardar")
+        p2.locator("#toast", has_text="Datos actualizados").wait_for(timeout=60000)
+        check("bajo CSP: diálogos y edición", any(r.get("empresa") == "Empresa CSP" for r in registros()))
+        check("la política CSP no bloqueó nada del panel", not viol, "; ".join(viol)[:300])
+        check("sin errores de JavaScript bajo CSP", not errs2, "; ".join(errs2)[:300])
+        ctx2.close()
         b.close()
 finally:
     for pr in procs:
