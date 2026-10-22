@@ -59,7 +59,7 @@ async function crearBlob(buffer) {
 
 /**
  * Un único commit con varios archivos.
- * archivos: [{ rel, sha }] para binarios ya subidos o [{ rel, texto }] para texto.
+ * archivos: [{ rel, sha }] binarios ya subidos, [{ rel, texto }] texto o [{ rel, borrar: true }] para eliminar.
  */
 async function confirmar(archivos, mensaje) {
   const a = ajustes();
@@ -73,7 +73,7 @@ async function confirmar(archivos, mensaje) {
       path: `${a.dir}/${f.rel}`,
       mode: "100644",
       type: "blob",
-      ...(f.sha ? { sha: f.sha } : { content: f.texto }),
+      ...(f.borrar ? { sha: null } : f.sha ? { sha: f.sha } : { content: f.texto }),
     })),
   });
   const commit = await gh("POST", ruta(a, "/git/commits"), { message: mensaje, tree: tree.sha, parents: [padre] });
@@ -81,7 +81,19 @@ async function confirmar(archivos, mensaje) {
   return commit.sha;
 }
 
+/** De las rutas dadas (relativas a PUBLIC_DIR), las que existen hoy en la rama. */
+async function rutasExistentes(rels) {
+  const a = ajustes();
+  const ref = await gh("GET", ruta(a, `/git/ref/heads/${encodeURIComponent(a.rama)}`));
+  if (!ref) throw new HttpError(502, `La rama ${a.rama} no existe en ${a.repo}`);
+  const commit = await gh("GET", ruta(a, `/git/commits/${ref.object.sha}`));
+  const arbol = await gh("GET", ruta(a, `/git/trees/${commit.tree.sha}?recursive=1`));
+  if (!arbol || arbol.truncated) throw new HttpError(502, "No se pudo listar el repositorio (demasiado grande)");
+  const presentes = new Set(arbol.tree.map((t) => t.path));
+  return rels.filter((r) => presentes.has(`${a.dir}/${r}`));
+}
+
 /** ¿El error es una carrera con otro commit (la rama avanzó)? */
 const esConflicto = (e) => e && (e.githubStatus === 422 || e.githubStatus === 409) && /fast.?forward|reference|conflict/i.test(e.githubMensaje || "");
 
-module.exports = { leerArchivo, crearBlob, confirmar, esConflicto, ajustes };
+module.exports = { leerArchivo, crearBlob, confirmar, rutasExistentes, esConflicto, ajustes };

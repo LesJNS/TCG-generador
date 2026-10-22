@@ -5,7 +5,9 @@ const gh = require("./_github");
 const MAX_ITEMS = 40;
 
 async function intentar({ items, sobrescribir }) {
-  const [textoLista, plantilla] = await Promise.all([gh.leerArchivo("data/certificados.json"), gh.leerArchivo("credencial.html")]);
+  const [textoLista, plantilla, textoElim] = await Promise.all([
+    gh.leerArchivo("data/certificados.json"), gh.leerArchivo("credencial.html"), gh.leerArchivo("data/eliminados.json")]);
+  const eliminados = textoElim ? JSON.parse(textoElim) : [];
   if (!plantilla) throw new HttpError(502, "No se encontró credencial.html en el repositorio público");
   const lista = textoLista ? JSON.parse(textoLista) : [];
   const archivos = [];
@@ -18,6 +20,7 @@ async function intentar({ items, sobrescribir }) {
     for (const k of ["png", "jpg", "pdf"]) if (!RE_SHA.test(it[k] || "")) throw new HttpError(400, `${r.codigo}: falta el archivo ${k}`);
     if (vistos.has(r.codigo)) throw new HttpError(400, `Código repetido en el lote: ${r.codigo}`);
     vistos.add(r.codigo);
+    if (eliminados.includes(r.codigo)) throw new HttpError(409, `El código ${r.codigo} fue eliminado y no se puede reutilizar`);
 
     const i = lista.findIndex((c) => c.codigo === r.codigo);
     if (i >= 0 && !sobrescribir) throw new HttpError(409, `El código ${r.codigo} ya existe`);

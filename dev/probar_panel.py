@@ -128,6 +128,10 @@ try:
     J = {"Content-Type": "application/json", "Cookie": cookie}
     check("editar sin cambios -> 400", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["TCG-CI-2026-001"]}).encode(), J)[0] == 400)
     check("editar con código inválido -> 400", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["../x"], "empresa": "a"}).encode(), J)[0] == 400)
+    check("POST /api/eliminar sin sesión -> 401", http(f"{BASE}/api/eliminar", "POST", b"{}", {"Content-Type": "application/json"})[0] == 401)
+    check("eliminar con lista inválida -> 400", http(f"{BASE}/api/eliminar", "POST", json.dumps({"codigos": ["../x"]}).encode(), J)[0] == 400)
+    check("eliminar lista vacía -> 400", http(f"{BASE}/api/eliminar", "POST", json.dumps({"codigos": []}).encode(), J)[0] == 400)
+    check("eliminar código inexistente -> 404", http(f"{BASE}/api/eliminar", "POST", json.dumps({"codigos": ["TCG-CI-2026-999"]}).encode(), J)[0] == 404)
     check("editar código inexistente -> 404", http(f"{BASE}/api/editar", "POST", json.dumps({"codigos": ["TCG-CI-2026-999"], "empresa": "a"}).encode(), J)[0] == 404)
     s, c, _, _ = http(f"{BASE}/api/blob", "POST", b"", {"Content-Type": "application/octet-stream", "Cookie": cookie})
     check("blob vacío -> 400", s == 400)
@@ -380,6 +384,62 @@ try:
         vig = sum(1 for r in registros() if r["estado"] == "vigente")
         check("PDF único de todo: una página por certificado vigente (el revocado no sale)", pymupdf.open(ruta).page_count == vig == 15, f"{pymupdf.open(ruta).page_count} págs, {ruta.stat().st_size / 1e6:.1f} MB")
         shutil.rmtree(tmp, ignore_errors=True)
+
+        print("== Eliminar ==")
+        for i in ("#f-desde", "#f-hasta", "#buscar"):
+            pg.fill(i, "")
+        pg.uncheck("#chk-todos")
+        check("sin selección, el botón masivo 'Eliminar…' está deshabilitado", pg.is_disabled("#b-eliminar"))
+
+        # -- uno por la fila: pide escribir ELIMINAR; cancelar no borra
+        pg.fill("#buscar", "TCG-CI-2026-016")
+        pg.locator("#tbody tr button", has_text="Eliminar").click()
+        pg.wait_for_selector("#dlg-eliminar[open]")
+        check("diálogo: título y botón de confirmar deshabilitado al abrir", "TCG-CI-2026-016" in pg.inner_text("#x-titulo") and pg.is_disabled("#x-ok"))
+        pg.fill("#x-confirmar", "eliminar")
+        check("'eliminar' en minúsculas no habilita el botón", pg.is_disabled("#x-ok"))
+        pg.click("#x-cancelar")
+        check("cancelar no borra nada", any(r["codigo"] == "TCG-CI-2026-016" for r in registros()))
+        n_log = len(gh_log())
+        pg.locator("#tbody tr button", has_text="Eliminar").click()
+        pg.wait_for_selector("#dlg-eliminar[open]")
+        pg.fill("#x-confirmar", "ELIMINAR")
+        check("escribir ELIMINAR habilita el botón", pg.is_enabled("#x-ok"))
+        pg.click("#x-ok")
+        pg.wait_for_function("/1 certificado\\(s\\) eliminado/i.test(document.getElementById('toast').textContent)", timeout=60000)
+        regs = registros()
+        check("eliminar uno: un solo commit y sale del JSON", len(gh_log()) == n_log + 1 and gh_log()[-1]["message"] == "Elimina TCG-CI-2026-016" and len(regs) == 15 and not any(r["codigo"] == "TCG-CI-2026-016" for r in regs), gh_log()[-1]["message"])
+        lista = gh_lista()
+        check("eliminar uno: borró PNG, JPG, PDF y la página; los demás siguen",
+              not any("TCG-CI-2026-016" in f for f in lista) and "publico/certs/TCG-CI-2026-012.png" in lista and "publico/c/TCG-CI-2026-012.html" in lista)
+        check("el código eliminado queda registrado (data/eliminados.json)", json.loads(gh_archivo("publico/data/eliminados.json")) == ["TCG-CI-2026-016"])
+        sig = json.loads(http(f"{BASE}/api/estado", headers={"Cookie": cookie})[1])["siguienteCodigo"]
+        check("el código eliminado NO se vuelve a sugerir (017, no 016)", sig == "TCG-CI-2026-017", sig)
+        cuerpo = json.dumps({"items": [{"registro": {"codigo": "TCG-CI-2026-016", "nombre": "x", "capacitacion": "x", "fechas": "x", "frase": "x"}, "png": "0" * 40, "jpg": "0" * 40, "pdf": "0" * 40}]}).encode()
+        st, resp, _, _ = http(f"{BASE}/api/publicar", "POST", cuerpo, J)
+        check("emitir con un código eliminado -> 409", st == 409 and "eliminado" in resp.decode(), resp.decode()[:90])
+
+        # -- varios a la vez, incluyendo un revocado (015) y uno sin archivos en el repo (005)
+        pg.fill("#buscar", "")
+        codigos = ["TCG-CI-2026-005", "TCG-CI-2026-013", "TCG-CI-2026-014", "TCG-CI-2026-015"]
+        for c in codigos:
+            pg.check(f'#tbody tr[data-codigo="{c}"] input[type=checkbox]')
+        check("el botón 'Eliminar…' se habilita con selección", pg.is_enabled("#b-eliminar"))
+        n_log = len(gh_log())
+        pg.click("#b-eliminar")
+        pg.wait_for_selector("#dlg-eliminar[open]")
+        check("diálogo masivo: lista los 4 y marca el revocado", "4 certificados" in pg.inner_text("#x-titulo") and "(revocado)" in pg.inner_text("#x-lista") and all(c in pg.inner_text("#x-lista") for c in codigos))
+        pg.fill("#x-confirmar", "ELIMINAR"); pg.click("#x-ok")
+        pg.wait_for_function("/4 certificado\\(s\\) eliminado/i.test(document.getElementById('toast').textContent)", timeout=60000)
+        regs = registros()
+        check("eliminar varios: un solo commit para los 4", len(gh_log()) == n_log + 1 and gh_log()[-1]["message"] == "Elimina 4 certificados" and len(regs) == 11, gh_log()[-1]["message"])
+        lista = gh_lista()
+        check("eliminar varios: no queda ningún archivo de esos 4 (aunque 005 no tenía archivos)", not any(c in f for f in lista for c in codigos))
+        check("eliminados.json acumula los códigos", json.loads(gh_archivo("publico/data/eliminados.json")) == sorted(["TCG-CI-2026-016"] + codigos))
+        check("la selección se limpia tras eliminar", pg.is_disabled("#b-eliminar") and "Sin selección" in pg.inner_text("#sel-info"))
+        check("los eliminados ya no aparecen en la tabla", not any(c in pg.inner_text("#tbody") for c in codigos))
+        sig = json.loads(http(f"{BASE}/api/estado", headers={"Cookie": cookie})[1])["siguienteCodigo"]
+        check("siguiente código sigue siendo 017 (nunca se reutilizan)", sig == "TCG-CI-2026-017", sig)
 
         print("== Salir ==")
         pg.click("#b-salir")

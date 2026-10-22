@@ -93,6 +93,7 @@
         </select>
         <button id="b-descargar" class="primary" type="button">Descargar</button>
         <button id="b-asignar" class="ghost" type="button">Asignar empresa/área…</button>
+        <button id="b-eliminar" class="ghost peligro" type="button">Eliminar…</button>
       </span>
     </div>
     <div class="scroll">
@@ -139,6 +140,24 @@
     <p class="row fin">
       <button type="button" id="e-cancelar" class="ghost">Cancelar</button>
       <button type="submit" id="e-guardar" class="primary">Guardar y publicar</button>
+    </p>
+  </form>
+</dialog>
+
+<dialog id="dlg-eliminar">
+  <form method="dialog" id="form-eliminar">
+    <h2 id="x-titulo">Eliminar certificados</h2>
+    <p id="x-lista" class="x-lista"></p>
+    <p class="nota">Se borran el registro y los archivos (PNG, PDF y la página <code>/c/CÓDIGO</code>). Quien escanee su QR verá
+      <strong>“Certificado no encontrado”</strong>. El código <strong>no se vuelve a usar</strong>.</p>
+    <p class="nota">Si el certificado ya se entregó, conviene <strong>Revocar</strong>: así el QR muestra “revocado” en lugar de “no encontrado”.
+      Eliminar es para errores o pruebas.</p>
+    <label>Escribe <code>ELIMINAR</code> para confirmar
+      <input id="x-confirmar" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="row fin">
+      <button type="button" id="x-cancelar" class="ghost">Cancelar</button>
+      <button type="submit" id="x-ok" class="primary peligro-fondo" disabled>Eliminar definitivamente</button>
     </p>
   </form>
 </dialog>

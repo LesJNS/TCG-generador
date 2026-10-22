@@ -94,12 +94,12 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
 
 const ordenar = (lista) => lista.sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
 
-function siguienteCodigo(lista) {
+function siguienteCodigo(lista, eliminados = []) {
   const pref = `${CONFIG.prefijoCodigo}-${hoyLima().slice(0, 4)}-`;
   let max = 0;
-  for (const c of lista) {
-    if (c.codigo.startsWith(pref)) {
-      const n = parseInt(c.codigo.slice(pref.length), 10);
+  for (const codigo of [...lista.map((c) => c.codigo), ...eliminados]) {
+    if (codigo.startsWith(pref)) {
+      const n = parseInt(codigo.slice(pref.length), 10);
       if (n > max) max = n;
     }
   }

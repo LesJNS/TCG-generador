@@ -59,6 +59,10 @@ sesiones abiertas, cambia también `SESSION_SECRET`.
   - **Editar** (por fila) o **Asignar empresa/área…** (a la selección): cambia esos dos datos en un solo commit,
     sin tocar las imágenes ni los QR. En la edición masiva solo cambian los campos que llenes.
   - **Revocar / Reactivar** (commit al JSON).
+  - **Eliminar** (por fila, o *Eliminar…* para la selección): pide escribir `ELIMINAR`, borra el registro y los
+    archivos (PNG, JPG, PDF y la página `/c/CÓDIGO`) en un solo commit. Quien escanee su QR verá "no encontrado".
+    El código se anota en `data/eliminados.json` y **no se reutiliza nunca** (así un QR ya impreso no puede
+    apuntar a otra persona). Si el certificado ya se entregó, es mejor **Revocar**: el QR muestra "revocado".
 - **Importación masiva**: CSV `nombre, capacitacion, fechas` y, opcionalmente, `empresa, area`; todo el lote en
   un solo commit.
 - **Ajustes**: muestra `BASE_URL` y el repo. Si cambia la dirección pública: edita `BASE_URL` en Vercel,
@@ -84,14 +88,14 @@ python dev/probar_panel.py
 Arranca un GitHub simulado (`dev/github_falso.js`, sembrado con `../publico`) y el servidor de desarrollo
 (`dev/servidor.js`), y recorre: login y errores de seguridad, emisión (PNG sin pérdida, QR decodificado
 en PNG/JPG/PDF), revocar, importación masiva en un commit, conflicto de commits con reintento,
-regeneración, empresa y edición masiva, filtros por fecha, descargas (PNG/PDF directos, ZIP y PDF único con QR
+regeneración, eliminación, empresa y edición masiva, filtros por fecha, descargas (PNG/PDF directos, ZIP y PDF único con QR
 decodificado) y cierre de sesión. Requiere Node 20+, `playwright`, `pillow`,
 `opencv-python`, `pymupdf`.
 
 ## Estructura
 
 ```
-api/          funciones de Vercel: login, logout, estado, blob, publicar, estado-cert, editar (+ _auth, _github, _comun)
+api/          funciones de Vercel: login, logout, estado, blob, publicar, estado-cert, editar, eliminar (+ _auth, _github, _comun)
 public/       panel (HTML/JS puros): index.html, app.js, render.js, png.js, vendor/, plantilla/
 dev/          servidor de desarrollo, GitHub simulado y prueba de extremo a extremo
 ```

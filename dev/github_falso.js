@@ -71,9 +71,17 @@ http.createServer(async (req, res) => {
   if (req.method === "GET" && (m = r.match(/^\/git\/commits\/(\w+)$/))) {
     const c = commits.get(m[1]); return c ? json(res, 200, { sha: m[1], tree: { sha: c.tree } }) : json(res, 404, { message: "Not Found" });
   }
+  if (req.method === "GET" && (m = r.match(/^\/git\/trees\/(\w+)$/))) {
+    const t = arboles.get(m[1]);
+    return t ? json(res, 200, { sha: m[1], truncated: false, tree: [...t].map(([path, sha]) => ({ path, type: "blob", sha })) }) : json(res, 404, { message: "Not Found" });
+  }
   if (req.method === "POST" && r === "/git/trees") {
     const mapa = new Map(arboles.get(body.base_tree) || []);
     for (const e of body.tree) {
+      if (e.sha === null) { // sha nulo = borrar (GitHub falla si la ruta no existe)
+        if (!mapa.has(e.path)) return json(res, 422, { message: `GitRPC::BadObjectState: no existe ${e.path}` });
+        mapa.delete(e.path); continue;
+      }
       let s = e.sha;
       if (e.content !== undefined) s = blob(Buffer.from(e.content, "utf8"));
       if (!blobs.has(s)) return json(res, 422, { message: `Invalid tree entry: sha ${s} no existe` });

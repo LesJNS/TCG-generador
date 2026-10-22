@@ -68,3 +68,11 @@ dialog::backdrop { background:rgba(11,42,85,.5); }
 dialog h2 { margin:0 0 6px; font-size:19px; color:var(--navy); }
 dialog form { display:flex; flex-direction:column; gap:12px; }
 .row.fin { justify-content:flex-end; margin:6px 0 0; }
+
+/* ---- eliminar ---- */
+button.peligro { color:var(--bad); border-color:var(--bad); }
+button.peligro:hover:not(:disabled) { background:#fbeceb; }
+button.peligro:disabled { opacity:.45; cursor:not-allowed; }
+button.peligro-fondo { background:var(--bad); border-color:var(--bad); }
+button.peligro-fondo:hover:not(:disabled) { background:#a02d22; }
+.x-lista { max-height:140px; overflow:auto; margin:0; padding:8px 10px; background:#f6f8fc; border:1px solid var(--line); border-radius:6px; font-size:14px; }

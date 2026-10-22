@@ -257,6 +257,7 @@
       (o.omitidos ? ` · ${o.omitidos} revocado(s) no se incluyen` : "");
     $("b-descargar").disabled = !o.lista.length;
     $("b-asignar").disabled = !S.seleccion.size;
+    $("b-eliminar").disabled = !S.seleccion.size;
     document.querySelectorAll("#tbody tr").forEach((tr) => tr.classList.toggle("sel", S.seleccion.has(tr.dataset.codigo)));
   }
 
@@ -283,6 +284,7 @@
       const a = document.createElement("a"); a.textContent = "Página"; a.href = `${S.config.baseUrl}/c/${c.codigo}`; a.target = "_blank"; a.rel = "noopener"; acc.appendChild(a);
       boton("Editar", () => abrirEditar([c.codigo]));
       boton(c.estado === "vigente" ? "Revocar" : "Reactivar", () => cambiarEstado(c), c.estado === "vigente" ? "danger" : "");
+      boton("Eliminar", () => abrirEliminar([c.codigo]), "danger");
       tb.appendChild(tr);
     }
     $("vacio").hidden = filas.length > 0;
@@ -349,6 +351,36 @@
       toast(`${lista.length} certificado(s) descargado(s)`);
     } catch (e) { toast(e.message, true); }
     finally { progreso(); actualizarSeleccion(); }
+  }
+
+  // ---------- eliminar ----------
+  let porEliminar = [];
+
+  function abrirEliminar(codigos) {
+    const regs = S.certificados.filter((c) => codigos.includes(c.codigo));
+    if (!regs.length) return;
+    porEliminar = regs.map((c) => c.codigo);
+    $("x-titulo").textContent = regs.length === 1 ? `Eliminar ${regs[0].codigo}` : `Eliminar ${regs.length} certificados`;
+    $("x-lista").textContent = regs.map((c) => `${c.codigo} · ${c.nombre}${c.estado === "vigente" ? "" : " (revocado)"}`).join("\n");
+    $("x-lista").style.whiteSpace = "pre-line";
+    $("x-confirmar").value = "";
+    $("x-ok").disabled = true;
+    $("dlg-eliminar").showModal();
+    $("x-confirmar").focus();
+  }
+
+  async function ejecutarEliminar(ev) {
+    ev.preventDefault();
+    if ($("x-confirmar").value.trim() !== "ELIMINAR") return;
+    const codigos = porEliminar.slice();
+    $("dlg-eliminar").close();
+    try {
+      progreso("Eliminando y publicando en GitHub…", 0.5);
+      await api("/api/eliminar", { codigos });
+      codigos.forEach((c) => S.seleccion.delete(c));
+      progreso(); await recargar();
+      toast(`${codigos.length} certificado(s) eliminado(s)`);
+    } catch (e) { progreso(); toast(e.message, true); }
   }
 
   // ---------- editar empresa / área ----------
@@ -524,6 +556,10 @@
     $("b-asignar").addEventListener("click", () => abrirEditar([...S.seleccion]));
     $("form-editar").addEventListener("submit", guardarEdicion);
     $("e-cancelar").addEventListener("click", () => $("dlg-editar").close());
+    $("b-eliminar").addEventListener("click", () => abrirEliminar([...S.seleccion]));
+    $("x-confirmar").addEventListener("input", () => ($("x-ok").disabled = $("x-confirmar").value.trim() !== "ELIMINAR"));
+    $("form-eliminar").addEventListener("submit", ejecutarEliminar);
+    $("x-cancelar").addEventListener("click", () => $("dlg-eliminar").close());
     $("csv-file").addEventListener("change", async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try { cargarCsv(await f.text()); } catch (err) { filasCsv = []; renderMasivo(); toast(err.message, true); }
