@@ -192,6 +192,9 @@ try:
               "sacudir" in (pg.get_attribute("#form-login", "class") or "") and pg.evaluate("document.activeElement.id") == "l-pass"
               and pg.is_enabled("#l-btn") and pg.inner_text("#l-btn").strip() == "Ingresar")
         check("el logo de Towers del login carga", pg.evaluate("document.querySelector('.marca-logo img').naturalWidth") > 0)
+        centro = pg.evaluate("""() => { const p = document.querySelector('.login-marca').getBoundingClientRect(), l = document.querySelector('.marca-logo').getBoundingClientRect();
+            return Math.abs((p.left + p.width / 2) - (l.left + l.width / 2)); }""")
+        check("el logo de Towers está centrado horizontalmente en el panel de marca", centro < 2, f"desfase {centro:.1f}px")
         check("pantalla ancha: panel de marca y formulario a la vez", pg.is_visible(".login-marca") and pg.is_visible("#form-login"))
         pg.fill("#l-pass", "abc123")
         check("la contraseña empieza oculta", pg.get_attribute("#l-pass", "type") == "password" and pg.get_attribute("#l-ver", "aria-pressed") == "false")

@@ -122,14 +122,15 @@ a.btn-link:hover { background:#eaf3fb; }
   background:linear-gradient(135deg, rgba(18,181,203,.55), rgba(18,181,203,.12)); border-radius:28px; }
 .login-marca::after { content:""; position:absolute; right:70px; bottom:-120px; width:12px; height:420px; transform:rotate(45deg); background:linear-gradient(#f3d27a,#c9a23a); opacity:.9; }
 .login-marca > * { position:relative; z-index:1; }
-.marca-logo { align-self:flex-start; background:#fff; border-radius:14px; padding:12px 18px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
+.marca-logo { align-self:center; background:#fff; border-radius:14px; padding:12px 18px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
 .marca-logo img { display:block; height:auto; }
+.marca-centro { text-align:center; }
 .marca-etiqueta { margin:0 0 10px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#8fd8e6; font-weight:600; }
-.marca-centro h2 { margin:0 0 22px; font-size:clamp(26px,3.2vw,38px); line-height:1.15; font-weight:700; max-width:16em; }
-.marca-lista { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; max-width:26em; }
+.marca-centro h2 { margin:0 auto 22px; font-size:clamp(26px,3.2vw,38px); line-height:1.15; font-weight:700; max-width:16em; }
+.marca-lista { list-style:none; margin:0 auto; padding:0; text-align:left; display:flex; flex-direction:column; gap:12px; max-width:26em; }
 .marca-lista li { display:flex; gap:12px; align-items:flex-start; font-size:16px; line-height:1.4; color:#e6f0fb; }
 .marca-lista .ico { flex:none; width:22px; height:22px; border-radius:50%; background:rgba(18,181,203,.25); border:1px solid rgba(143,216,230,.7); color:#bff1fa; font-size:13px; display:grid; place-items:center; margin-top:1px; }
-.marca-pie { margin:0; font-size:13px; color:#a9c4e6; }
+.marca-pie { margin:0; font-size:13px; color:#a9c4e6; text-align:center; }
 
 .login-panel { display:grid; place-items:center; padding:32px 24px; }
 .login-card { width:100%; max-width:400px; display:flex; flex-direction:column; gap:8px; }
@@ -174,5 +175,7 @@ button.primary.entrar:disabled { opacity:1; cursor:progress; background:#4d9bd1;
   .login-marca::before { width:200px; height:200px; right:-70px; bottom:-90px; }
   .login-marca::after { display:none; }
   .login-panel { align-items:start; padding-top:26px; }
-  .login-logo-movil { display:block; }
+  .login-logo-movil { display:block; margin:0 auto 12px; }
+  .login-cabecera { text-align:center; }
+  .marca-centro { text-align:left; }
 }
