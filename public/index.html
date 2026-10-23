@@ -5,21 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Panel de certificados · TCG</title>
+<link rel="icon" href="assets/logo.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- LOGIN -->
 <div id="login" class="login" hidden>
-  <form id="form-login" class="login-card" autocomplete="on">
-    <h1>Panel de certificados</h1>
-    <p class="nota">Towers Consulting Group (TCG) · acceso restringido</p>
-    <label>Contraseña
-      <input id="l-pass" type="password" autocomplete="current-password" required autofocus>
-    </label>
-    <p id="l-error" class="aviso err" role="alert"></p>
-    <button class="primary" type="submit" id="l-btn">Ingresar</button>
-  </form>
+  <aside class="login-marca" aria-hidden="false">
+    <div class="marca-logo"><img src="assets/logo.png" alt="Towers Consulting Group" width="150"></div>
+    <div class="marca-centro">
+      <p class="marca-etiqueta">Panel de administración</p>
+      <h2>Certificados verificables con código QR</h2>
+      <ul class="marca-lista">
+        <li><span class="ico" aria-hidden="true">&#10003;</span>Emite certificados uno a uno o por lote.</li>
+        <li><span class="ico" aria-hidden="true">&#10003;</span>Cada QR lleva a una página pública de verificación.</li>
+        <li><span class="ico" aria-hidden="true">&#10003;</span>Revoca o elimina cuando haga falta.</li>
+      </ul>
+    </div>
+    <p class="marca-pie">&copy; Towers Consulting Group (TCG)</p>
+  </aside>
+
+  <section class="login-panel">
+    <form id="form-login" class="login-card" autocomplete="on">
+      <div class="login-cabecera">
+        <img class="login-logo-movil" src="assets/logo.png" alt="" width="64" height="57">
+        <h1>Bienvenido</h1>
+        <p class="nota">Ingresa la contraseña para administrar los certificados.</p>
+      </div>
+      <input class="solo-lectores" type="text" name="usuario" autocomplete="username" value="Panel TCG" tabindex="-1" aria-hidden="true" readonly>
+      <label for="l-pass">Contraseña</label>
+      <div class="campo-pass">
+        <svg class="ico-candado" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1zm2 0h6V8a3 3 0 0 0-6 0v2zm3 4a1.5 1.5 0 0 0-.75 2.8V18h1.5v-1.2A1.5 1.5 0 0 0 12 14z" fill="currentColor"/></svg>
+        <input id="l-pass" type="password" autocomplete="current-password" required autofocus placeholder="Tu contraseña">
+        <button id="l-ver" class="ver-pass" type="button" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
+          <svg class="ojo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5c5 0 9.3 3.1 11 7-1.7 3.9-6 7-11 7S2.7 15.9 1 12c1.7-3.9 6-7 11-7zm0 2C8.5 7 5.4 9 3.5 12c1.9 3 5 5 8.5 5s6.6-2 8.5-5c-1.9-3-5-5-8.5-5zm0 1.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5zm0 2A1.5 1.5 0 1 0 13.5 12 1.5 1.5 0 0 0 12 10.5z" fill="currentColor"/></svg>
+          <svg class="ojo-tachado" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3.3 2 22 20.7 20.7 22l-3.2-3.2A11.7 11.7 0 0 1 12 20C7 20 2.7 16.9 1 13a12.4 12.4 0 0 1 4.1-4.9L2 5.3 3.3 2zM12 6c5 0 9.3 3.1 11 7a12 12 0 0 1-2.6 3.6l-1.4-1.4A9.8 9.8 0 0 0 20.5 13C18.6 10 15.5 8 12 8c-.9 0-1.8.1-2.6.4L7.8 6.8A11.6 11.6 0 0 1 12 6zm0 3.5a3.5 3.5 0 0 1 3.5 3.5l-3.5-3.5z" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <p id="l-caps" class="aviso-caps" hidden>Bloq Mayús está activado</p>
+      <p id="l-error" class="aviso err" role="alert"></p>
+      <button class="primary entrar" type="submit" id="l-btn"><span class="etq">Ingresar</span></button>
+      <p class="login-pie">Acceso restringido. La sesión se cierra al cerrar la pestaña o tras 2 horas sin actividad.</p>
+    </form>
+  </section>
 </div>
 
 <!-- PANEL -->

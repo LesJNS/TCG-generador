@@ -87,18 +87,27 @@
     ["f-nombre", "f-area", "f-empresa"].forEach((i) => ($(i).value = ""));
   }
 
-  function mostrarLogin() { limpiarDatos(); $("app").hidden = true; $("login").hidden = false; $("l-pass").focus(); }
+  function mostrarLogin() {
+    limpiarDatos(); $("app").hidden = true; $("login").hidden = false;
+    $("l-pass").type = "password"; $("l-ver").setAttribute("aria-pressed", "false"); $("l-caps").hidden = true;
+    $("l-pass").focus();
+  }
 
   async function onLogin(ev) {
     ev.preventDefault();
-    const b = $("l-btn"); b.disabled = true; $("l-error").textContent = "";
+    const b = $("l-btn"), etq = b.querySelector(".etq"), tarjeta = $("form-login");
+    b.disabled = true; b.classList.add("cargando"); etq.textContent = "Ingresando…";
+    $("l-error").textContent = "";
     try {
       const r = await api("/api/login", { password: $("l-pass").value });
       guardarToken(r.token);
       $("l-pass").value = "";
       await entrar();
-    } catch (e) { $("l-error").textContent = e.message; }
-    finally { b.disabled = false; }
+    } catch (e) {
+      $("l-error").textContent = e.message;
+      tarjeta.classList.remove("sacudir"); void tarjeta.offsetWidth; tarjeta.classList.add("sacudir"); // sacudida breve
+      $("l-pass").focus(); $("l-pass").select();
+    } finally { b.disabled = false; b.classList.remove("cargando"); etq.textContent = "Ingresar"; }
   }
 
   function salir() {
@@ -659,6 +668,18 @@
       cargarImg("plantilla/certificado_base.png"),
     ]);
     $("form-login").addEventListener("submit", onLogin);
+    $("l-ver").addEventListener("click", () => {   // mostrar u ocultar la contraseña
+      const visible = $("l-pass").type === "password";
+      $("l-pass").type = visible ? "text" : "password";
+      $("l-ver").setAttribute("aria-pressed", String(visible));
+      const t = visible ? "Ocultar contraseña" : "Mostrar contraseña";
+      $("l-ver").setAttribute("aria-label", t); $("l-ver").title = t;
+      $("l-pass").focus();
+    });
+    const avisarMayusculas = (e) => { if (e.getModifierState) $("l-caps").hidden = !e.getModifierState("CapsLock"); };
+    $("l-pass").addEventListener("keydown", avisarMayusculas);
+    $("l-pass").addEventListener("keyup", avisarMayusculas);
+    $("l-pass").addEventListener("blur", () => ($("l-caps").hidden = true));
     $("b-salir").addEventListener("click", salir);
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
       document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));

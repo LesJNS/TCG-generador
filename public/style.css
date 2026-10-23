@@ -38,11 +38,7 @@ code { background:#e7eef8; padding:1px 6px; border-radius:4px; }
 .toast.show { opacity:1; } .toast.err { background:var(--bad); }
 
 /* ---- login y extras del panel online ---- */
-.login { min-height:100vh; display:grid; place-items:center; padding:20px; background:linear-gradient(160deg,#0b2a55,#0070c0); }
-.login[hidden], #app[hidden] { display:none; }
-.login-card { background:#fff; border-radius:12px; padding:28px 26px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:14px; box-shadow:0 10px 40px rgba(0,0,0,.25); }
-.login-card h1 { margin:0; font-size:22px; color:var(--navy); }
-.login-card .nota { margin:0; }
+#app[hidden] { display:none; }
 button.salir { background:transparent; color:#fff; border-color:rgba(255,255,255,.6); padding:4px 12px; }
 button.salir:hover { background:rgba(255,255,255,.15); }
 .bar .row { gap:12px; }
@@ -111,4 +107,72 @@ a.btn-link:hover { background:#eaf3fb; }
   .ver-cuerpo { display:grid; grid-template-columns:minmax(0,1.9fr) minmax(280px,1fr); column-gap:20px; align-items:start; }
   .ver-barra { grid-column:1 / -1; }
   .ver-datos { grid-template-columns:1fr; }
+}
+
+/* ================= LOGIN ================= */
+.login { min-height:100vh; min-height:100dvh; display:grid; grid-template-columns:minmax(320px,1.05fr) minmax(360px,1fr); background:#f2f6fc; }
+.login[hidden] { display:none; }
+
+.login-marca { position:relative; overflow:hidden; color:#fff; padding:40px 48px; display:flex; flex-direction:column; justify-content:space-between; gap:32px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(18,181,203,.28), transparent 42%),
+    radial-gradient(rgba(255,255,255,.07) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    linear-gradient(155deg, #0b2a55 0%, #0a478c 55%, #0070c0 100%); }
+.login-marca::before { content:""; position:absolute; right:-90px; bottom:-90px; width:360px; height:360px; transform:rotate(45deg);
+  background:linear-gradient(135deg, rgba(18,181,203,.55), rgba(18,181,203,.12)); border-radius:28px; }
+.login-marca::after { content:""; position:absolute; right:70px; bottom:-120px; width:12px; height:420px; transform:rotate(45deg); background:linear-gradient(#f3d27a,#c9a23a); opacity:.9; }
+.login-marca > * { position:relative; z-index:1; }
+.marca-logo { align-self:flex-start; background:#fff; border-radius:14px; padding:12px 18px; box-shadow:0 8px 28px rgba(0,0,0,.25); }
+.marca-logo img { display:block; height:auto; }
+.marca-etiqueta { margin:0 0 10px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#8fd8e6; font-weight:600; }
+.marca-centro h2 { margin:0 0 22px; font-size:clamp(26px,3.2vw,38px); line-height:1.15; font-weight:700; max-width:16em; }
+.marca-lista { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; max-width:26em; }
+.marca-lista li { display:flex; gap:12px; align-items:flex-start; font-size:16px; line-height:1.4; color:#e6f0fb; }
+.marca-lista .ico { flex:none; width:22px; height:22px; border-radius:50%; background:rgba(18,181,203,.25); border:1px solid rgba(143,216,230,.7); color:#bff1fa; font-size:13px; display:grid; place-items:center; margin-top:1px; }
+.marca-pie { margin:0; font-size:13px; color:#a9c4e6; }
+
+.login-panel { display:grid; place-items:center; padding:32px 24px; }
+.login-card { width:100%; max-width:400px; display:flex; flex-direction:column; gap:8px; }
+.login-cabecera { margin-bottom:10px; }
+.login-cabecera h1 { margin:0 0 6px; font-size:30px; color:var(--navy); line-height:1.15; }
+.login-cabecera .nota { margin:0; font-size:15px; }
+.login-logo-movil { display:none; margin-bottom:12px; width:auto; height:56px; }
+.login-card label { margin-top:10px; font-size:14px; }
+.solo-lectores { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+
+.campo-pass { position:relative; }
+.campo-pass input { padding:13px 46px 13px 44px; font-size:16px; border-radius:10px; border:1.5px solid #b9c8dc; background:#fff; transition:border-color .15s, box-shadow .15s; }
+.campo-pass input:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 4px rgba(0,112,192,.16); }
+.ico-candado { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#7d8fa8; pointer-events:none; }
+.campo-pass input:focus ~ .ico-candado, .campo-pass:focus-within .ico-candado { color:var(--blue); }
+.ver-pass { position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; padding:0; border:0; border-radius:8px; background:transparent; color:#6b7d96; display:grid; place-items:center; cursor:pointer; }
+.ver-pass:hover { background:#eaf3fb; color:var(--blue); }
+.ver-pass:focus-visible { outline:3px solid rgba(0,112,192,.35); }
+.ver-pass .ojo-tachado { display:none; }
+.ver-pass[aria-pressed="true"] .ojo { display:none; }
+.ver-pass[aria-pressed="true"] .ojo-tachado { display:block; }
+
+.aviso-caps { margin:2px 0 0; font-size:13px; color:#8a5a00; background:#fff6dd; border:1px solid #f0d58a; border-radius:8px; padding:6px 10px; }
+.aviso-caps[hidden] { display:none; }
+.login-card .aviso { margin:0; min-height:1.3em; }
+.entrar { margin-top:8px; padding:14px 16px; font-size:16px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow:0 6px 16px rgba(0,112,192,.28); }
+.entrar:hover:not(:disabled) { background:#005fa3; }
+button.primary.entrar:disabled { opacity:1; cursor:progress; background:#4d9bd1; border-color:#4d9bd1; box-shadow:none; }
+.entrar.cargando::before { content:""; width:16px; height:16px; border:2.5px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:girar .7s linear infinite; }
+.login-pie { margin:12px 0 0; font-size:12.5px; color:var(--muted); line-height:1.45; }
+.login-card.sacudir { animation:sacudir .4s; }
+@keyframes girar { to { transform:rotate(360deg); } }
+@keyframes sacudir { 20%,60% { transform:translateX(-7px); } 40%,80% { transform:translateX(7px); } }
+@media (prefers-reduced-motion: reduce) { .login-card.sacudir, .entrar.cargando::before { animation:none; } }
+
+@media (max-width: 860px) {
+  .login { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .login-marca { padding:22px 24px 26px; gap:14px; }
+  .login-marca .marca-logo { display:none; }
+  .marca-centro h2 { font-size:22px; margin-bottom:0; }
+  .marca-lista, .marca-pie { display:none; }
+  .login-marca::before { width:200px; height:200px; right:-70px; bottom:-90px; }
+  .login-marca::after { display:none; }
+  .login-panel { align-items:start; padding-top:26px; }
+  .login-logo-movil { display:block; }
 }
