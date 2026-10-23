@@ -49,10 +49,13 @@ sesiones abiertas, cambia también `SESSION_SECRET`.
 - **Emitir**: completa los campos y *Generar y publicar certificado*. La **empresa** y el **área** son
   opcionales y no se imprimen (solo quedan en el registro). El sitio público muestra el certificado cuando
   termina su despliegue (~1 minuto).
-- **Emitidos**: tabla con columnas Código, Participante, **Empresa**, Área, Emisión y Estado.
-  - *Buscar* por código, nombre, empresa, área o capacitación, y *filtrar por rango de fechas de emisión*.
-  - **Descarga directa** de un certificado: botones **PNG** y **PDF** de cada fila (se generan al instante en el
-    navegador, con el QR actual).
+- **Emitidos**: tabla con Código, Participante, **Empresa**, Área, Emisión y Estado, un resumen
+  (total / vigentes / revocados) y, por fila: **Previsualizar**, **Descargar ▾** (PNG o PDF al instante, con el QR
+  actual), **Editar** y **⋯** (abrir página pública, Revocar/Reactivar, Eliminar).
+  - *Buscar* por código, nombre, empresa, área o capacitación; *filtrar* por empresa, estado y rango de fechas de
+    emisión; *ordenar* haciendo clic en el encabezado de cada columna.
+  - **Previsualizar** abre el certificado en grande con sus datos; ← → para pasar al anterior o siguiente de la
+    lista (respeta filtros y orden), y desde ahí puedes descargar el PNG o el PDF.
   - **Descarga por rango o selección**: marca casillas (la casilla de arriba marca todos los visibles) o deja
     sin marcar para usar todo lo que se ve; elige *PDF único*, *ZIP de PDF* o *ZIP de PNG* y pulsa **Descargar**.
     Los revocados no se incluyen. Máximo 60 certificados por descarga.

@@ -15,6 +15,7 @@ import tempfile
 import zipfile
 import os
 import re
+import re
 import secrets
 import subprocess
 import sys
@@ -84,6 +85,16 @@ def gh_log():
 
 def registros():
     return json.loads(gh_archivo("publico/data/certificados.json"))
+
+
+def accion_menu(pg_, tipo, item, codigo=None):
+    """Abre el menú 'Descargar ▾' (tipo='descargar') o '⋯' (tipo='mas') de una fila y pulsa un ítem."""
+    fila = pg_.locator(f'#tbody tr[data-codigo="{codigo}"]') if codigo else pg_.locator("#tbody tr").first
+    if tipo == "descargar":
+        fila.locator("button", has_text="Descargar").click()
+    else:
+        fila.locator('button[aria-label="Más acciones"]').click()
+    pg_.locator("#menu-global button", has_text=item).click()
 
 
 def firmar_token(inicio_ms, vence_ms, secreto=None):
@@ -246,12 +257,12 @@ try:
         print("== Revocar / reactivar ==")
         pg.click('[data-tab="emitidos"]')
         pg.fill("#buscar", "TCG-CI-2026-012")
-        pg.locator("#tbody tr button", has_text="Revocar").click()
+        accion_menu(pg, "mas", "Revocar")
         pg.wait_for_function("document.querySelector('#tbody .badge').textContent === 'revocado'", timeout=60000)
         r = [x for x in registros() if x["codigo"] == "TCG-CI-2026-012"][0]
         check("revocar: JSON estado=revocado con fecha", r["estado"] == "revocado" and "fecha_revocacion" in r)
         check("revocar: un solo commit nuevo", gh_log()[-1]["message"] == "Revoca TCG-CI-2026-012" and len(gh_log()) == 2)
-        pg.locator("#tbody tr button", has_text="Reactivar").click()
+        accion_menu(pg, "mas", "Reactivar")
         pg.wait_for_function("document.querySelector('#tbody .badge').textContent === 'vigente'", timeout=60000)
         r = [x for x in registros() if x["codigo"] == "TCG-CI-2026-012"][0]
         check("reactivar: vigente y sin fecha_revocacion", r["estado"] == "vigente" and "fecha_revocacion" not in r)
@@ -290,7 +301,7 @@ try:
         print("== Revocado + regenerar todos ==")
         pg.click('[data-tab="emitidos"]')
         pg.fill("#buscar", "TCG-CI-2026-015")
-        pg.locator("#tbody tr button", has_text="Revocar").click()
+        accion_menu(pg, "mas", "Revocar")
         pg.wait_for_function("document.querySelector('#tbody .badge').textContent === 'revocado'", timeout=60000)
         antes = {r["codigo"]: (r["fecha_emision"], r["estado"]) for r in registros()}
         pg.click('[data-tab="ajustes"]')
@@ -374,11 +385,11 @@ try:
         # -- descarga directa de uno
         pg.uncheck("#chk-todos")
         pg.fill("#buscar", "TCG-CI-2026-001")
-        nom, ruta = descargar_con(lambda: pg.locator("#tbody tr button", has_text="PNG").click(), "uno.png")
+        nom, ruta = descargar_con(lambda: accion_menu(pg, "descargar", "PNG"), "uno.png")
         datos = ruta.read_bytes()
         im = Image.open(io.BytesIO(datos)); im.load()
         check("descarga directa PNG: nombre, tamaño 3200x1800 y QR de ese certificado", nom == "TCG-CI-2026-001.png" and im.size == (3200, 1800) and qr_de_png(datos) == f"{BASE_URL}/c/TCG-CI-2026-001", nom)
-        nom, ruta = descargar_con(lambda: pg.locator("#tbody tr button", has_text="PDF").click(), "uno.pdf")
+        nom, ruta = descargar_con(lambda: accion_menu(pg, "descargar", "PDF"), "uno.pdf")
         datos = ruta.read_bytes()
         check("descarga directa PDF: 1 página y QR de ese certificado", nom == "TCG-CI-2026-001.pdf" and pymupdf.open(stream=datos, filetype="pdf").page_count == 1 and qr_de_pdf(datos) == f"{BASE_URL}/c/TCG-CI-2026-001", nom)
 
@@ -418,6 +429,99 @@ try:
         check("PDF único de todo: una página por certificado vigente (el revocado no sale)", pymupdf.open(ruta).page_count == vig == 15, f"{pymupdf.open(ruta).page_count} págs, {ruta.stat().st_size / 1e6:.1f} MB")
         shutil.rmtree(tmp, ignore_errors=True)
 
+        print("== Lista mejorada: alineación, filtros, orden, menús y previsualización ==")
+        pg.fill("#buscar", "")
+        for i in ("#f-desde", "#f-hasta"):
+            pg.fill(i, "")
+        pg.select_option("#f-emp", ""); pg.select_option("#f-est", "")
+        if pg.is_checked("#chk-todos"):
+            pg.uncheck("#chk-todos")
+        pg.wait_for_selector("#tbody tr")
+
+        # -- la tabla mantiene su estructura (antes las celdas de acciones rompían las líneas de las filas)
+        displays = pg.evaluate("[...document.querySelectorAll('#tbody tr')].map(tr => [...tr.children].map(td => getComputedStyle(td).display))")
+        check("todas las celdas son celdas de tabla (las líneas de las filas ya no se rompen)", all(d == "table-cell" for fila in displays for d in fila))
+        desfase = pg.evaluate("""() => {
+            const tr = document.querySelector('#tbody tr'), nombre = tr.children[3], acc = tr.querySelector('.acc-flex');
+            const c = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
+            return Math.abs(c(nombre) - c(acc));
+        }""")
+        check("el texto y los botones de la fila están alineados al centro", desfase < 4, f"{desfase:.1f}px")
+        vig = sum(1 for r in registros() if r["estado"] == "vigente"); tot = len(registros())
+        check("resumen: totales, vigentes y revocados", pg.inner_text("#resumen").startswith(f"{tot} certificado(s) · {vig} vigente(s) · {tot - vig} revocado(s)"), pg.inner_text("#resumen"))
+        check("cada fila tiene solo 4 acciones (Previsualizar, Descargar, Editar, ⋯)", pg.locator("#tbody tr").first.locator("button").count() == 4)
+
+        # -- filtros por empresa y por estado
+        opciones = pg.locator("#f-emp option").all_inner_texts()
+        check("el filtro de empresa lista las empresas que existen", {"Todas", "(Sin empresa)", "Grupo Norte", "Consorcio Andino S.A."} <= set(opciones), str(opciones))
+        pg.select_option("#f-emp", "Grupo Norte")
+        esperado = sum(1 for r in registros() if r.get("empresa") == "Grupo Norte")
+        check("filtrar por empresa", pg.locator("#tbody tr").count() == esperado == 5 and "mostrando 5" in pg.inner_text("#resumen"), pg.inner_text("#resumen"))
+        pg.select_option("#f-emp", "__sin__")
+        sin = sum(1 for r in registros() if not r.get("empresa"))
+        check("filtrar por '(Sin empresa)'", pg.locator("#tbody tr").count() == sin > 0, str(sin))
+        pg.select_option("#f-emp", "")
+        pg.select_option("#f-est", "revocado")
+        check("filtrar por estado revocado", pg.locator("#tbody tr").count() == 1 and "revocado" in pg.inner_text("#tbody"))
+        check("el revocado ofrece 'Reactivar' (no 'Revocar') en su menú", (pg.locator('#tbody tr button[aria-label="Más acciones"]').click() or True) and pg.locator("#menu-global button", has_text="Reactivar").count() == 1 and pg.locator("#menu-global button", has_text="Revocar").count() == 0)
+        pg.keyboard.press("Escape")
+        pg.select_option("#f-est", "vigente")
+        check("filtrar por estado vigente", pg.locator("#tbody tr").count() == vig)
+        pg.click("#b-limpiar")
+        check("'Limpiar filtros' restablece todo", pg.locator("#tbody tr").count() == tot and pg.input_value("#f-emp") == "" and pg.input_value("#f-est") == "")
+
+        # -- orden por columnas
+        nombres = lambda: pg.locator("#tbody tr td:nth-child(3)").all_inner_texts()
+        pg.click('th[data-orden="nombre"]')
+        asc = nombres()
+        check("ordenar por Participante A→Z", asc == sorted(asc, key=lambda x: x.lower()) and pg.get_attribute('th[data-orden="nombre"]', "aria-sort") == "ascending", asc[0])
+        pg.click('th[data-orden="nombre"]')
+        check("segundo clic: Z→A", nombres() == asc[::-1] and pg.get_attribute('th[data-orden="nombre"]', "aria-sort") == "descending")
+        pg.click('th[data-orden="codigo"]')
+        check("volver a ordenar por Código", pg.locator("#tbody tr td:nth-child(2)").first.inner_text() == min(r["codigo"] for r in registros()))
+
+        # -- menús flotantes
+        pg.fill("#buscar", "TCG-CI-2026-002")
+        pg.locator("#tbody tr").first.locator("button", has_text="Descargar").click()
+        check("el menú Descargar muestra PNG y PDF", pg.locator("#menu-global").is_visible() and pg.locator("#menu-global button").count() == 2)
+        pg.mouse.click(700, 120)   # clic fuera
+        check("clic fuera cierra el menú", pg.locator("#menu-global").is_hidden())
+        pg.locator("#tbody tr").first.locator('button[aria-label="Más acciones"]').click()
+        check("el menú ⋯ ofrece página pública, revocar y eliminar", [t.strip() for t in pg.locator("#menu-global button").all_inner_texts()] == ["Abrir página pública", "Revocar", "Eliminar…"])
+        pg.keyboard.press("Escape")
+        check("Escape cierra el menú", pg.locator("#menu-global").is_hidden())
+        pg.fill("#buscar", "")
+
+        # -- previsualizar
+        pg.locator('#tbody tr[data-codigo="TCG-CI-2026-002"] button', has_text="Previsualizar").click()
+        pg.wait_for_selector("#dlg-ver[open]")
+        pg.wait_for_timeout(500)
+        check("previsualizar: título, estado y posición", pg.inner_text("#v-codigo") == "TCG-CI-2026-002" and pg.inner_text("#v-estado") == "vigente" and re.match(r"^2 de \d+$", pg.inner_text("#v-pos").strip()) is not None, pg.inner_text("#v-pos"))
+        check("previsualizar: muestra los datos del registro", "Rodriguez Gomez" in pg.inner_text("#v-nombre") and "CALIFICACIÓN" in pg.inner_text("#v-capacitacion") and pg.inner_text("#v-area") == "TI" and "Grupo Norte" in pg.inner_text("#v-empresa"))
+        dim = pg.evaluate("[document.getElementById('v-canvas').width, document.getElementById('v-canvas').height]")
+        du = pg.evaluate("document.getElementById('v-canvas').toDataURL('image/png')")
+        qr = decodificar_qr(cv2.imdecode(np.frombuffer(base64.b64decode(du.split(",")[1]), np.uint8), cv2.IMREAD_COLOR))
+        check("previsualizar: certificado 3200x1800 con el QR de ese código", dim == [3200, 1800] and qr == f"{BASE_URL}/c/TCG-CI-2026-002", f"{dim} {qr}")
+        check("previsualizar: enlace a la página pública", pg.get_attribute("#v-pagina", "href") == f"{BASE_URL}/c/TCG-CI-2026-002")
+        pg.keyboard.press("ArrowRight")
+        check("flecha → pasa al siguiente certificado", pg.inner_text("#v-codigo") == "TCG-CI-2026-003" and pg.inner_text("#v-nombre") == "Roy Roger Rios Nuñez")
+        pg.keyboard.press("ArrowLeft"); pg.keyboard.press("ArrowLeft")
+        check("flecha ← pasa al anterior; en el primero 'Anterior' se deshabilita", pg.inner_text("#v-codigo") == "TCG-CI-2026-001" and pg.is_disabled("#v-ant") and pg.is_enabled("#v-sig"))
+        nom, ruta = descargar_con(lambda: pg.click("#v-png"), "desde_vista.png")
+        check("descargar PNG desde la previsualización", nom == "TCG-CI-2026-001.png" and Image.open(ruta).size == (3200, 1800), nom)
+        pg.keyboard.press("Escape")
+        check("Escape cierra la previsualización", not pg.evaluate("document.getElementById('dlg-ver').open"))
+        pg.locator('#tbody tr[data-codigo="TCG-CI-2026-002"] button', has_text="Previsualizar").click()
+        pg.wait_for_selector("#dlg-ver[open]")
+        pg.mouse.click(4, 4)   # clic en el fondo oscuro
+        check("clic fuera de la ventana la cierra", not pg.evaluate("document.getElementById('dlg-ver').open"))
+        pg.select_option("#f-est", "revocado")
+        pg.locator("#tbody tr button", has_text="Previsualizar").click()
+        pg.wait_for_selector("#dlg-ver[open]")
+        check("previsualizar un revocado: marca 'revocado' y es 1 de 1 (sin navegación)", pg.inner_text("#v-estado") == "revocado" and pg.inner_text("#v-pos").strip() == "1 de 1" and pg.is_disabled("#v-ant") and pg.is_disabled("#v-sig"))
+        pg.keyboard.press("Escape")
+        pg.click("#b-limpiar")
+
         print("== Eliminar ==")
         for i in ("#f-desde", "#f-hasta", "#buscar"):
             pg.fill(i, "")
@@ -426,7 +530,7 @@ try:
 
         # -- uno por la fila: pide escribir ELIMINAR; cancelar no borra
         pg.fill("#buscar", "TCG-CI-2026-016")
-        pg.locator("#tbody tr button", has_text="Eliminar").click()
+        accion_menu(pg, "mas", "Eliminar")
         pg.wait_for_selector("#dlg-eliminar[open]")
         check("diálogo: título y botón de confirmar deshabilitado al abrir", "TCG-CI-2026-016" in pg.inner_text("#x-titulo") and pg.is_disabled("#x-ok"))
         pg.fill("#x-confirmar", "eliminar")
@@ -434,7 +538,7 @@ try:
         pg.click("#x-cancelar")
         check("cancelar no borra nada", any(r["codigo"] == "TCG-CI-2026-016" for r in registros()))
         n_log = len(gh_log())
-        pg.locator("#tbody tr button", has_text="Eliminar").click()
+        accion_menu(pg, "mas", "Eliminar")
         pg.wait_for_selector("#dlg-eliminar[open]")
         pg.fill("#x-confirmar", "ELIMINAR")
         check("escribir ELIMINAR habilita el botón", pg.is_enabled("#x-ok"))
@@ -503,9 +607,9 @@ try:
         p2.click('[data-tab="emitidos"]')
         p2.fill("#buscar", "Prueba Bajo CSP")
         with p2.expect_download(timeout=120000) as d1:
-            p2.locator("#tbody tr button", has_text="PNG").click()
+            accion_menu(p2, "descargar", "PNG")
         with p2.expect_download(timeout=120000) as d2:
-            p2.locator("#tbody tr button", has_text="PDF").click()
+            accion_menu(p2, "descargar", "PDF")
         check("bajo CSP: descargas directas PNG y PDF", d1.value.suggested_filename.endswith(".png") and d2.value.suggested_filename.endswith(".pdf"))
         p2.fill("#buscar", "")
         p2.select_option("#d-formato", "zip-png")

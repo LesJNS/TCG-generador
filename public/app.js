@@ -198,6 +198,7 @@
     $("c-base").textContent = S.config.baseUrl;
     $("c-repo").textContent = S.repo;
     $("pill-repo").textContent = "Publica en " + S.repo;
+    llenarEmpresas();
     renderLista();
   }
 
@@ -251,12 +252,32 @@
   // ---------- lista ----------
   const MAX_DESCARGA = 60; // límite por descarga para no agotar la memoria del navegador
 
+  const orden = { campo: "codigo", dir: 1 };
+  const clave = (c, campo) => String(c[campo] || "").toLowerCase();
+  const comparar = (a, b) => a.localeCompare(b, "es", { numeric: true });
+
   function filtrados() {
     const q = $("buscar").value.trim().toLowerCase();
     const desde = $("f-desde").value, hasta = $("f-hasta").value;
-    return S.certificados.filter((c) =>
-      (!q || [c.codigo, c.nombre, c.empresa, c.area, c.capacitacion].join(" ").toLowerCase().includes(q)) &&
-      (!desde || c.fecha_emision >= desde) && (!hasta || c.fecha_emision <= hasta));
+    const emp = $("f-emp").value, est = $("f-est").value;
+    return S.certificados
+      .filter((c) =>
+        (!q || [c.codigo, c.nombre, c.empresa, c.area, c.capacitacion].join(" ").toLowerCase().includes(q)) &&
+        (!emp || (emp === "__sin__" ? !c.empresa : c.empresa === emp)) &&
+        (!est || c.estado === est) &&
+        (!desde || c.fecha_emision >= desde) && (!hasta || c.fecha_emision <= hasta))
+      .sort((a, b) => comparar(clave(a, orden.campo), clave(b, orden.campo)) * orden.dir || comparar(a.codigo, b.codigo));
+  }
+
+  /** Rellena el filtro de empresas con las que existen (conserva la elección si sigue existiendo). */
+  function llenarEmpresas() {
+    const sel = $("f-emp"), actual = sel.value;
+    const empresas = [...new Set(S.certificados.map((c) => c.empresa).filter(Boolean))].sort(comparar);
+    sel.innerHTML = "";
+    const op = (valor, texto) => { const o = document.createElement("option"); o.value = valor; o.textContent = texto; sel.appendChild(o); };
+    op("", "Todas"); op("__sin__", "(Sin empresa)");
+    empresas.forEach((e) => op(e, e));
+    sel.value = [...sel.options].some((o) => o.value === actual) ? actual : "";
   }
 
   /** Qué se descargaría ahora: la selección o, si no hay, todo lo que se ve. Los revocados se omiten. */
@@ -283,8 +304,36 @@
     document.querySelectorAll("#tbody tr").forEach((tr) => tr.classList.toggle("sel", S.seleccion.has(tr.dataset.codigo)));
   }
 
+  // ---- menú flotante (una sola instancia, fuera de la tabla para que no lo recorte el desplazamiento)
+  let menuDe = null;
+  function cerrarMenu() {
+    const m = $("menu-global");
+    m.hidden = true; m.innerHTML = "";
+    if (menuDe) { menuDe.setAttribute("aria-expanded", "false"); menuDe = null; }
+  }
+  function abrirMenu(btn, items) {
+    if (menuDe === btn) return cerrarMenu();
+    cerrarMenu();
+    const m = $("menu-global");
+    items.forEach(([texto, fn, clase]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "menuitem"); b.className = "menu-item " + (clase || ""); b.textContent = texto;
+      b.onclick = () => { cerrarMenu(); fn(); };
+      m.appendChild(b);
+    });
+    m.hidden = false;
+    const r = btn.getBoundingClientRect(), alto = m.offsetHeight, ancho = m.offsetWidth;
+    const abajo = r.bottom + 4 + alto <= window.innerHeight;
+    m.style.top = (abajo ? r.bottom + 4 : Math.max(4, r.top - 4 - alto)) + "px";
+    m.style.left = Math.max(4, Math.min(r.right - ancho, window.innerWidth - ancho - 4)) + "px";
+    btn.setAttribute("aria-expanded", "true");
+    menuDe = btn;
+    m.firstChild.focus({ preventScroll: true });
+  }
+
   function renderLista() {
     const tb = $("tbody"); tb.innerHTML = "";
+    cerrarMenu();
     const filas = filtrados();
     for (const c of [...S.seleccion]) if (!filas.some((f) => f.codigo === c)) S.seleccion.delete(c); // la selección siempre es visible
     for (const c of filas) {
@@ -296,22 +345,72 @@
       chk.type = "checkbox"; chk.checked = S.seleccion.has(c.codigo); chk.setAttribute("aria-label", "Seleccionar " + c.codigo);
       chk.onchange = () => { chk.checked ? S.seleccion.add(c.codigo) : S.seleccion.delete(c.codigo); actualizarSeleccion(); };
       tdChk.appendChild(chk);
-      celda(c.codigo); celda(c.nombre); celda(c.empresa || "—"); celda(c.area || "—"); celda(c.fecha_emision);
+      celda(c.codigo).className = "cod";
+      celda(c.nombre);
+      const tdEmp = celda(c.empresa || "—"); if (!c.empresa) tdEmp.className = "vacio";
+      const tdArea = celda(c.area || "—"); if (!c.area) tdArea.className = "vacio";
+      celda(c.fecha_emision);
       const tdE = celda(""); const sp = document.createElement("span");
       sp.className = "badge " + c.estado; sp.textContent = c.estado; tdE.appendChild(sp);
+
       const acc = celda(""); acc.className = "acc";
-      const boton = (txt, fn, clase) => { const b = document.createElement("button"); b.type = "button"; b.className = "mini " + (clase || ""); b.textContent = txt; b.onclick = fn; acc.appendChild(b); return b; };
-      boton("PNG", () => descargarUno(c, "png"));
-      boton("PDF", () => descargarUno(c, "pdf"));
-      const a = document.createElement("a"); a.textContent = "Página"; a.href = `${S.config.baseUrl}/c/${c.codigo}`; a.target = "_blank"; a.rel = "noopener"; acc.appendChild(a);
+      const caja = document.createElement("div"); caja.className = "acc-flex"; acc.appendChild(caja);
+      const boton = (txt, fn, clase, etiqueta) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "mini " + (clase || ""); b.textContent = txt; b.onclick = fn;
+        if (etiqueta) { b.setAttribute("aria-label", etiqueta); b.title = etiqueta; b.setAttribute("aria-haspopup", "true"); b.setAttribute("aria-expanded", "false"); }
+        caja.appendChild(b); return b;
+      };
+      boton("Previsualizar", () => abrirVista(c.codigo), "primario");
+      const dl = boton("Descargar ▾", () => abrirMenu(dl, [["PNG (alta resolución)", () => descargarUno(c, "png")], ["PDF", () => descargarUno(c, "pdf")]]), "", "Descargar este certificado");
       boton("Editar", () => abrirEditar([c.codigo]));
-      boton(c.estado === "vigente" ? "Revocar" : "Reactivar", () => cambiarEstado(c), c.estado === "vigente" ? "danger" : "");
-      boton("Eliminar", () => abrirEliminar([c.codigo]), "danger");
+      const mas = boton("⋯", () => abrirMenu(mas, [
+        ["Abrir página pública", () => window.open(`${S.config.baseUrl}/c/${c.codigo}`, "_blank", "noopener")],
+        [c.estado === "vigente" ? "Revocar" : "Reactivar", () => cambiarEstado(c), c.estado === "vigente" ? "peligro" : ""],
+        ["Eliminar…", () => abrirEliminar([c.codigo]), "peligro"],
+      ]), "", "Más acciones");
       tb.appendChild(tr);
     }
     $("vacio").hidden = filas.length > 0;
+    const vig = S.certificados.filter((c) => c.estado === "vigente").length;
+    $("resumen").textContent = `${S.certificados.length} certificado(s) · ${vig} vigente(s) · ${S.certificados.length - vig} revocado(s)` +
+      (filas.length !== S.certificados.length ? ` — mostrando ${filas.length}` : "");
+    document.querySelectorAll("th[data-orden]").forEach((th) =>
+      th.setAttribute("aria-sort", th.dataset.orden === orden.campo ? (orden.dir > 0 ? "ascending" : "descending") : "none"));
     actualizarSeleccion(filas);
   }
+
+  // ---------- vista previa ----------
+  function abrirVista(codigo) {
+    const lista = filtrados();
+    const i = lista.findIndex((c) => c.codigo === codigo);
+    if (i < 0) return;
+    const c = lista[i];
+    $("v-codigo").textContent = c.codigo;
+    const est = $("v-estado"); est.textContent = c.estado; est.className = "badge " + c.estado;
+    $("v-pos").textContent = `${i + 1} de ${lista.length}`;
+    dibujar($("v-canvas"), c);
+    $("v-nombre").textContent = c.nombre;
+    $("v-capacitacion").textContent = c.capacitacion;
+    $("v-fechas").textContent = c.fechas;
+    $("v-empresa").textContent = c.empresa || "—";
+    $("v-area").textContent = c.area || "—";
+    $("v-emision").textContent = c.fecha_emision;
+    $("v-ant").disabled = i === 0;
+    $("v-sig").disabled = i === lista.length - 1;
+    $("v-pagina").href = `${S.config.baseUrl}/c/${c.codigo}`;
+    const d = $("dlg-ver");
+    d.dataset.codigo = c.codigo;
+    if (!d.open) d.showModal();
+  }
+
+  function moverVista(delta) {
+    const lista = filtrados();
+    const i = lista.findIndex((c) => c.codigo === $("dlg-ver").dataset.codigo) + delta;
+    if (i >= 0 && i < lista.length) abrirVista(lista[i].codigo);
+  }
+
+  const registroDeVista = () => S.certificados.find((c) => c.codigo === $("dlg-ver").dataset.codigo);
 
   async function cambiarEstado(c) {
     const nuevo = c.estado === "vigente" ? "revocado" : "vigente";
@@ -568,12 +667,40 @@
     ["f-nombre", "f-capacitacion", "f-fechas", "f-frase", "f-empresa", "f-area", "f-codigo"].forEach((i) => $(i).addEventListener("input", () => actualizarPreview(true)));
     $("form").addEventListener("submit", onGenerar);
     $("b-sugerir").addEventListener("click", () => { $("f-codigo").value = S.siguiente; actualizarPreview(); });
-    ["buscar", "f-desde", "f-hasta"].forEach((i) => $(i).addEventListener("input", renderLista));
-    $("b-limpiar").addEventListener("click", () => { ["buscar", "f-desde", "f-hasta"].forEach((i) => ($(i).value = "")); renderLista(); });
+    ["buscar", "f-desde", "f-hasta", "f-emp", "f-est"].forEach((i) => $(i).addEventListener("input", renderLista));
+    $("b-limpiar").addEventListener("click", () => { ["buscar", "f-desde", "f-hasta", "f-emp", "f-est"].forEach((i) => ($(i).value = "")); renderLista(); });
     $("chk-todos").addEventListener("change", (e) => {
       filtrados().forEach((c) => (e.target.checked ? S.seleccion.add(c.codigo) : S.seleccion.delete(c.codigo)));
       renderLista();
     });
+    document.querySelectorAll("th[data-orden]").forEach((th) => {
+      const ordenar = () => {
+        orden.dir = orden.campo === th.dataset.orden ? -orden.dir : 1;
+        orden.campo = th.dataset.orden;
+        renderLista();
+      };
+      th.addEventListener("click", ordenar);
+      th.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ordenar(); } });
+    });
+    document.addEventListener("click", (e) => { if (menuDe && e.target !== menuDe && !$("menu-global").contains(e.target)) cerrarMenu(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuDe) cerrarMenu(); });
+    window.addEventListener("scroll", cerrarMenu, true);
+    window.addEventListener("resize", cerrarMenu);
+    $("menu-global").addEventListener("keydown", (e) => {
+      const items = [...$("menu-global").children], i = items.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+      if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    });
+    $("v-cerrar").addEventListener("click", () => $("dlg-ver").close());
+    $("v-ant").addEventListener("click", () => moverVista(-1));
+    $("v-sig").addEventListener("click", () => moverVista(1));
+    $("v-png").addEventListener("click", () => { const c = registroDeVista(); if (c) descargarUno(c, "png"); });
+    $("v-pdf").addEventListener("click", () => { const c = registroDeVista(); if (c) descargarUno(c, "pdf"); });
+    $("dlg-ver").addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); moverVista(-1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); moverVista(1); }
+    });
+    $("dlg-ver").addEventListener("click", (e) => { if (e.target === $("dlg-ver")) $("dlg-ver").close(); }); // clic fuera = cerrar
     $("b-descargar").addEventListener("click", descargar);
     $("b-asignar").addEventListener("click", () => abrirEditar([...S.seleccion]));
     $("form-editar").addEventListener("submit", guardarEdicion);

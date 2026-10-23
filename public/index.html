@@ -79,10 +79,13 @@
   <section id="tab-emitidos" class="panel" hidden>
     <div class="filtros">
       <input id="buscar" type="search" placeholder="Buscar por código, nombre, empresa, área…">
+      <label class="fecha">Empresa <select id="f-emp"><option value="">Todas</option></select></label>
+      <label class="fecha">Estado <select id="f-est"><option value="">Todos</option><option value="vigente">Vigentes</option><option value="revocado">Revocados</option></select></label>
       <label class="fecha">Emisión desde <input type="date" id="f-desde"></label>
       <label class="fecha">hasta <input type="date" id="f-hasta"></label>
       <button id="b-limpiar" class="ghost" type="button">Limpiar filtros</button>
     </div>
+    <p id="resumen" class="resumen"></p>
     <div class="descargas">
       <span id="sel-info" class="nota"></span>
       <span class="row">
@@ -100,7 +103,13 @@
       <table>
         <thead><tr>
           <th class="chk"><input type="checkbox" id="chk-todos" aria-label="Seleccionar todos los que se ven"></th>
-          <th>Código</th><th>Participante</th><th>Empresa</th><th>Área</th><th>Emisión</th><th>Estado</th><th>Acciones</th>
+          <th data-orden="codigo" tabindex="0" aria-sort="ascending">Código</th>
+          <th data-orden="nombre" tabindex="0">Participante</th>
+          <th data-orden="empresa" tabindex="0">Empresa</th>
+          <th data-orden="area" tabindex="0">Área</th>
+          <th data-orden="fecha_emision" tabindex="0">Emisión</th>
+          <th data-orden="estado" tabindex="0">Estado</th>
+          <th>Acciones</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -130,6 +139,37 @@
   </section>
 </main>
 </div>
+
+<dialog id="dlg-ver" class="ver" aria-label="Vista previa del certificado">
+  <div class="ver-cuerpo">
+    <div class="ver-barra">
+      <div><strong id="v-codigo"></strong> <span id="v-estado" class="badge"></span> <span class="nota" id="v-pos"></span></div>
+      <button id="v-cerrar" class="ghost" type="button" aria-label="Cerrar la vista previa">Cerrar ✕</button>
+    </div>
+    <canvas id="v-canvas" aria-label="Certificado"></canvas>
+    <div class="ver-panel">
+    <dl class="ver-datos">
+      <div><dt>Participante</dt><dd id="v-nombre"></dd></div>
+      <div><dt>Capacitación</dt><dd id="v-capacitacion"></dd></div>
+      <div><dt>Fechas</dt><dd id="v-fechas"></dd></div>
+      <div><dt>Empresa</dt><dd id="v-empresa"></dd></div>
+      <div><dt>Área</dt><dd id="v-area"></dd></div>
+      <div><dt>Emisión</dt><dd id="v-emision"></dd></div>
+    </dl>
+    <p class="nota">Vista generada con los datos del registro y el QR actual. Usa ← → para ir al anterior o siguiente de la lista.</p>
+    <div class="ver-acciones">
+      <button id="v-ant" class="ghost" type="button">← Anterior</button>
+      <button id="v-sig" class="ghost" type="button">Siguiente →</button>
+      <span class="espacio"></span>
+      <button id="v-png" class="ghost" type="button">Descargar PNG</button>
+      <button id="v-pdf" class="ghost" type="button">Descargar PDF</button>
+      <a id="v-pagina" class="btn-link" target="_blank" rel="noopener">Abrir página pública</a>
+    </div>
+    </div>
+  </div>
+</dialog>
+
+<div id="menu-global" class="menu" role="menu" hidden></div>
 
 <dialog id="dlg-editar">
   <form method="dialog" id="form-editar">
